@@ -16,6 +16,7 @@ pip install -r src/requirements.txt
 ```
 
 - Download a [web driver](https://sites.google.com/a/chromium.org/chromedriver/downloads) according to your chrome version ([how can I get the version of my chrome browser?](https://www.businessinsider.com/what-version-of-google-chrome-do-i-have?r=DE&IR=T)) and replace the driver in ```src/driver/```  with your own.
+- Log in [pixiv](www.pixiv.net) using your chrome browser with your own account for once.
 
 ## Usage
 
@@ -34,13 +35,15 @@ python src/pixiv.py [-h] [-s SEARCH] [-n NUMBER] [-o OUT] [--s_mode S_MODE] [--m
 ## Examples
 
 ```bash
-python src/pixiv.py -s "arknights 10000users" -n 100
+python src/pixiv.py -s "stein gate 1000users入り" -n 100
 ```
 
 ```bash
-python src/pixiv.py -s "arknights 10000users" -n 100 -o "./artworks" --s_mode partial --mode safe
+python src/pixiv.py -s "stein gate 1000users入り" -n 100 -o "./artworks" --s_mode partial --mode safe
 ```
 
 ## Note
 
 - Must have chrome installed on your device.
+- Privacy concern: this tool utilize cookies of [pixiv.net](www.pixiv.net) from your chrome browser only to load [dynamic pages](https://www.doteasy.com/web-hosting-articles/what-is-a-dynamic-web-page.cfm).
+
