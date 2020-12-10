@@ -4,3 +4,7 @@ class PageIsNotAvailableError(Exception):
 
 class BrowserTypeError(Exception):
     pass
+
+
+class InsufficientArtworks(Exception):
+    pass

@@ -1,46 +1,73 @@
 from bs4 import BeautifulSoup
 import requests
 import re
-from os.path import isfile
+import signal
 from utils.check_image import check_png_stream, check_jpg_jpeg_stream
+from utils.path import *
 from utils.logging import *
-from utils.path import mkdir
 from exception import *
 import browser_cookie3
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options as ChromeOption
-from selenium.webdriver.firefox.options import Options as FirefoxOption
 from urllib import parse
 from random import choice
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# from webdriver import Webdriver
-from os.path import basename
 
-
-class Pixiv():
+class Pixiv(object):
     domain = '.pixiv.net'
     home_page = "http://www.pixiv.net"
     ranking_page = 'https://www.pixiv.net/ranking.php'
 
-    def __init__(self, browser: str = 'chrome'):
+    def __init__(self, browser='chrome', print__=print_):
+        """
+        :param browser: 'chrome' or 'firefox'
+        :param version: browser version
+        :param print_: a function to log information
+        """
         self.headers = {
             'Referer': 'https://www.pixiv.net',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) '
                           'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'
         }
+        self.print_ = print__
         self.cookies = self.load_cookies(browser)
+        self.session = requests.Session()
+        self.session.cookies = self.cookies
+        self.session.headers = self.headers
+        self.set_environment_variable()
         if browser == 'chrome':
-            options = ChromeOption()
+            options = webdriver.ChromeOptions()
             options.add_argument('--headless')
+            options.add_argument('log-level=3')
+            options.add_experimental_option('excludeSwitches', ['enable-logging'])
             self.web_driver = webdriver.Chrome(options=options)
         elif browser == 'firefox':
-            options = FirefoxOption()
+            options = webdriver.FirefoxOptions()
             options.add_argument('--headless')
+            options.add_argument('log-level=3')
             self.web_driver = webdriver.Firefox(options=options)
 
     def __del__(self):
         self.web_driver.close()
+
+    def stop_signal_handler(self):
+        self.print_("early terminate")
+        self.__del__()
+        exit(0)
+
+    @staticmethod
+    def set_environment_variable():
+        path = join_(parent_path_(root_path_()), 'driver')
+        set_path_(path)
+
+    def check_terminate_signal(self):
+        signal.signal(
+            signal.SIGINT, self.stop_signal_handler()
+        )
+        signal.signal(
+            signal.SIGTERM,
+            self.stop_signal_handler()
+        )
 
     @staticmethod
     def load_cookies_from_txt(cookie_path):
@@ -73,6 +100,16 @@ class Pixiv():
         z.update(y)
         return z
 
+    def _session_get(self, url, retries=5, **kwargs):
+        last_connection_exception = None
+        while retries:
+            try:
+                return self.session.get(url, **kwargs)
+            except requests.exceptions.ConnectionError as e:
+                last_connection_exception = e
+                retries -= 1
+        raise last_connection_exception
+
     def get_page(self, url: str, cookies=None, headers=None, use_selenium=False):
         if cookies is None:
             cookies = self.cookies
@@ -82,7 +119,8 @@ class Pixiv():
             try:
                 # reload cookies
                 self.web_driver.delete_all_cookies()
-                self.web_driver.get(Pixiv.home_page)# https://stackoverflow.com/questions/41559510/selenium-chromedriver-add-cookie-invalid-domain-error/44857193
+                self.web_driver.get(
+                    Pixiv.home_page)  # https://stackoverflow.com/questions/41559510/selenium-chromedriver-add-cookie-invalid-domain-error/44857193
                 for cookie in cookies:
                     self.web_driver.add_cookie({"name": cookie.name, "value": cookie.value, "domain": cookie.domain})
 
@@ -92,7 +130,7 @@ class Pixiv():
             return {'html': self.web_driver.page_source,
                     'soup': BeautifulSoup(self.web_driver.page_source, features='lxml'), 'code': 200}
         else:
-            r = requests.get(url, cookies=cookies, headers=headers)
+            r = self._session_get(url)
             if r.status_code is not 200:
                 raise PageIsNotAvailableError
             return {'html': r.text, 'response': r, 'soup': BeautifulSoup(r.text, features='lxml'),
@@ -104,13 +142,13 @@ class Pixiv():
         url = url.replace('\\', '')
         return url
 
-    def download_(self, illusid: int, name: str, path: str):
-        print_(STD_INFO + 'start downloading ' + name)
+    def _download(self, illusid, name, path):
+        self.print_(STD_INFO + 'start downloading ' + name)
         url = self.get_url_by_illusid(illusid)
         try:
             response = self.get_page(url)['response']
         except:
-            print_(STD_ERROR + 'error occurred downloading ' + name + ' ' + url)
+            self.print_(STD_ERROR + 'error occurred downloading ' + name + ' ' + url)
             return
         bytestream = response.content
         if check_jpg_jpeg_stream(bytestream):
@@ -118,39 +156,41 @@ class Pixiv():
         elif check_png_stream(bytestream):
             image_type = '.png'
         else:
+            self.print_(STD_WARNING + 'unsupported format or broken file, drop: ' + name + ' ' + url)
             return
-        file_path = '{}/{}{}'.format(path, str(name), image_type)
-        if isfile(file_path):
-            file_path = '{}/{}(id:{}){}'.format(path, str(name), str(illusid), image_type)
+        file_path = '{}/{}_id_{}{}'.format(path, str(name), str(illusid), image_type)
         with open(file_path, 'wb') as f:
             f.write(bytestream)
 
     def download(self, artworks: dict, path, max_workers=10):
-        print_(STD_INFO + 'start downloading ' + str(len(artworks)) + ' items...')
-        mkdir(path)
+        self.print_(STD_INFO + 'start downloading ' + str(len(artworks)) + ' items...')
+        mkdir_(path)
         threads = []
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for name in artworks:
-                threads.append(executor.submit(self.download_, artworks[name], name, path))
+            for illusid in artworks:
+                threads.append(executor.submit(self._download, illusid, artworks[illusid], path))
             for task in as_completed(threads):
                 pass
-        pass
+        self.print_(STD_INFO + 'download finished ')
 
     @staticmethod
     def get_artworks_from_page(html):
         re_list = re.findall(r'.*artworks/(.*?)</a></div>.*', html)
+        if len(re_list) == 1:
+            if '<img src=' in re_list[0]:  # insufficient artworks
+                return {}
+        elif len(re_list) == 0:
+            return {}
         artworks = {}
         for string in re_list:
             string_list = string.split(r'">')
-            illusid = int(string_list[0])
+            illusid = string_list[0]
             name = string_list[-1]
-            if name in artworks:
-                name += '_'
-            artworks[name] = illusid
+            artworks[illusid] = name
         return artworks
 
-    def search(self, search_term: str, number, artwork_type: str = 'artworks', parameters: dict = None):
-        print_(STD_INFO + 'start searching...')
+    def search(self, search_term: str, number, artwork_type: str = 'artworks', parameters: dict = None, retries=3):
+        self.print_(STD_INFO + 'start searching...')
         if number == 'ALL':  # download all
             number = float('inf')
         else:
@@ -162,37 +202,38 @@ class Pixiv():
         artworks = {}
         page_number = 0
         while True:
-            # time.sleep(0.2)
             page_number += 1
             url = 'https://www.pixiv.net/tags/' + parse.quote(search_term) + '/' + artwork_type + '?' + para + '&' + \
                   'p=' + str(page_number)
-            print_(STD_INFO + url)
-
+            self.print_(STD_INFO + 'fetching ' + url)
             while True:
                 page = self.get_page(url, use_selenium=True)
-                section = page['soup'].find_all('section')
-                if len(section) > 0:
+                new_artworks = self.get_artworks_from_page(page['html'])
+                if new_artworks == {}:
+                    self.print_(STD_WARNING + 'insufficient artworks, retry')
+                else:
                     break
-                print_(STD_WARNING + 'cannot find specific <section> tag, load page again')
+                retries -= 1
+                if retries == 0:
+                    self.print_(STD_WARNING + 'insufficient artworks, ' + str(
+                        len(artworks)) + ' artworks have been found, return.')
+                    return artworks
 
-            new_artworks = self.get_artworks_from_page(page['html'])
-            print_(STD_INFO + str(len(new_artworks)) + ' new artworks have been found. ')
+            # merge artworks and new_artworks
+            self.print_(STD_INFO + str(len(new_artworks)) + ' new artworks have been found. ')
+            artworks = self.merge_two_dicts(new_artworks, artworks)
+            self.print_(STD_INFO + str(len(artworks)) + ' artworks have been found for now.')
 
             # check artworks's length, if surpassed the specific length, randomly pop items from the new_artworks
             length = len(artworks)
-            new_length = len(new_artworks)
-            if length + new_length >= number:
-                if length + new_length != number:
-                    print_(STD_INFO + 'surpassed by ' + str(length + new_length - number) + ' items, randomly pop.')
-                    for _ in range(length + new_length - number):
-                        new_artworks.pop(choice(list(new_artworks.keys())))
-                    artworks = self.merge_two_dicts(new_artworks, artworks)
+            if length >= number:
+                if length != number:
+                    self.print_(STD_INFO + 'surpassed by ' + str(length - number) + ' items, randomly drop.')
+                    for _ in range(length - number):
+                        artworks.pop(choice(list(artworks.keys())))
                 break
 
-            artworks = self.merge_two_dicts(new_artworks, artworks)
-
-        total = len(artworks)
-        print_(STD_INFO + str(total) + ' artworks have been found, return.')
+        self.print_(STD_INFO + str(len(artworks)) + ' artworks have been found, return.')
         return artworks
 
 
@@ -211,21 +252,26 @@ if __name__ == '__main__':
     # p = Pixiv()
     # url = p.get_url_by_illusid(86138069)
 
-    # p = Pixiv()
-    # url = 'https://www.pixiv.net/tags/lappland/artworks?s_mode=s_tag'
+    # p = Pixiv('chrome', 87)
+    # url = 'https://www.pixiv.net/tags/%E3%82%A2%E3%83%BC%E3%82%AF%E3%83%8A%E3%82%A4%E3%83%8410000users%E5%85%A5%E3%82%8A/artworks?mode=safe&p=8&s_mode=s_tag'
     # page = p.get_page(url, use_selenium=True)['html']
     # with open('page.html', 'w', encoding='utf-8') as f:
     #     f.write(page)
-
+    #
     # p = Pixiv()
     # with open('page.html', 'r', encoding='utf-8') as f:
     #     page = f.read()
     # artworks = p.get_artworks_from_page(page)
     # print(artworks)
 
-    p = Pixiv()
-    artworks = p.search('lappland', number=50)
-    p.download(artworks, '../lappland')
+    # p = Pixiv('chrome')
+    # terms = ['stein gate 1000users入り']
+    # # terms = ['アークナイツ10000users入り']
+    # # terms = ['lappland 10000users入り']
+    # for t in terms:
+    #     artworks = p.search(t, number=200)
+    #     # p.download(artworks, '../' + t)
+
 
     # p = Pixiv()
     # cookies = p.load_cookies('chrome')
@@ -234,3 +280,56 @@ if __name__ == '__main__':
     #     p.web_driver.add_cookie({"name": cookie.name, "value": cookie.value, "domain": cookie.domain})
     #     print({"name": cookie.name, "value": cookie.value, "domain": cookie.domain})
     # p.web_driver.get('https://www.pixiv.net/tags/lappland/artworks?s_mode=s_tag')
+
+    # from utils.path import *
+    # path = join_(parent_path_(root_path_()), 'chromedrivers', '87', 'chromedirver.exe')
+    # print(path)
+    # path = ';{}'.format(path)
+    # os.environ['PATH'] += path
+    # env = os.environ['PATH']
+    # print(path)
+    # print(env)
+
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-s", "--search", type=str)
+    parser.add_argument("-n", "--number", type=int)
+    parser.add_argument("-o", "--out", type=str, default=None)
+
+    parser.add_argument("--s_mode", type=str, default='partial')
+    parser.add_argument("--mode", type=str, default='all')
+
+    args = parser.parse_args()
+
+    parameters = {}
+    if args.s_mode == 'title':
+        parameters['s_mode'] = 's_tc'
+    elif args.s_mode == 'perfect':
+        pass
+    else:
+        parameters['s_mode'] = 's_tag'
+
+    if args.mode == 'safe':
+        parameters['mode'] = 'safe'
+    elif args.mode == 'r18':
+        parameters['mode'] = 'r18'
+    else:
+        pass
+
+    pixiv = Pixiv('chrome')
+    artworks = pixiv.search(args.search, args.number, parameters=parameters)
+    while True:
+        ans = input('Sure to download? [y/n]\n')
+        if ans in ['y', 'n']:
+            break
+    if ans == 'n':
+        pixiv.__del__()
+        exit(0)
+
+    if args.out is None:
+        out_dir = '../' + args.search
+    else:
+        out_dir = args.out
+
+    pixiv.download(artworks, out_dir)
