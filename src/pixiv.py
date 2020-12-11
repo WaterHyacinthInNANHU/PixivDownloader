@@ -299,6 +299,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--s_mode", type=str, default='partial')
     parser.add_argument("--mode", type=str, default='all')
+    parser.add_argument("-d", "--direct_download", action="store_true")
 
     args = parser.parse_args()
 
@@ -319,13 +320,15 @@ if __name__ == '__main__':
 
     pixiv = Pixiv('chrome')
     artworks = pixiv.search(args.search, args.number, parameters=parameters)
-    while True:
-        ans = input('Sure to download? [y/n]\n')
-        if ans in ['y', 'n']:
-            break
-    if ans == 'n':
-        pixiv.__del__()
-        exit(0)
+
+    if not args.direct_download:
+        while True:
+            ans = input('Sure to download? [y/n]\n')
+            if ans in ['y', 'n']:
+                break
+        if ans == 'n':
+            pixiv.__del__()
+            exit(0)
 
     if args.out is None:
         out_dir = '../' + args.search
