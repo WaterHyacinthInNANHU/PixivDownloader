@@ -22,8 +22,10 @@ pip install -r src/requirements.txt
 
 Open terminal under root folder of the project:
 
+**Search and download**
+
 ```bash
-python src/pixiv.py [-h] [-s SEARCH] [-n NUMBER] [-o OUT] [--s_mode S_MODE] [--mode MODE] [-d]
+python src/pixiv.py [-h] [-o OUT] [-s SEARCH] [-n NUMBER] [--s_mode S_MODE] [--mode MODE] [-d]
 ```
 
 - -s:	what you want to search for.
@@ -31,8 +33,18 @@ python src/pixiv.py [-h] [-s SEARCH] [-n NUMBER] [-o OUT] [--s_mode S_MODE] [--m
 - -o:	the folder to save artworks; default by a dictionary named by the term you searched for under root folder of project.
 - --s_mode:	matching option; default by partial matching; ```title``` for title matching; ```perfect``` for perfect matching.
 - --mode:	age limitation; default by no limit; ```safe``` for ALL AGE; ```r18``` for R18 ONLY
-
 - -d:	directly download searched results without asking for confirmation.
+
+**Download via illusid**
+
+```bash
+python src/pixiv.py [-h] [-o OUT] [-id ILLUSID] [--name NAME]
+```
+
+- -o:	the folder to save artworks; default by root folder of project.
+- -id:	the illusid of the artwork you want to download.
+
+- -- name:	a string to name the downloaded artwork.
 
 ## Examples
 
@@ -48,10 +60,16 @@ Search for 100 artworks related to "stein gate 1000users入り" and download the
 python src/pixiv.py -s "stein gate 1000users入り" -n 100 -d
 ```
 
-Search for 100 artworks perfectly matched with "stein gate 1000users入り"  for all ages and save it under "./artworks".
+Search for 100 artworks perfectly matched with "stein gate 1000users入り"  for all ages and save it under ```./artworks```.
 
 ```bash
 python src/pixiv.py -s "stein gate 1000users入り" -n 100 -o "./artworks" --s_mode perfect --mode safe
+```
+
+Download the artworks with illusid: 78396392 under ```./art```
+
+```bash
+python pixiv.py -id 78396392 --name artwork -o art
 ```
 
 ## Note

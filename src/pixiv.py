@@ -237,7 +237,76 @@ class Pixiv(object):
         return artworks
 
 
+def main(args):
+    pixiv = Pixiv('chrome')
+
+    # download by id
+    if args.illusid is not None:
+        if args.out is None:
+            out_dir = '../'
+        else:
+            out_dir = args.out
+        pixiv.download({args.illusid: args.name}, out_dir)
+        return
+
+    # search and download
+    parameters = {}
+    if args.s_mode == 'title':
+        parameters['s_mode'] = 's_tc'
+    elif args.s_mode == 'perfect':
+        pass
+    else:
+        parameters['s_mode'] = 's_tag'
+
+    if args.mode == 'safe':
+        parameters['mode'] = 'safe'
+    elif args.mode == 'r18':
+        parameters['mode'] = 'r18'
+    else:
+        pass
+
+    artworks = pixiv.search(args.search, args.number, parameters=parameters)
+
+    if not args.direct_download:
+        while True:
+            ans = input('Sure to download? [y/n]\n')
+            if ans in ['y', 'n']:
+                break
+        if ans == 'n':
+            return
+
+    if args.out is None:
+        out_dir = '../' + args.search
+    else:
+        out_dir = args.out
+
+    pixiv.download(artworks, out_dir)
+
+
 if __name__ == '__main__':
+
+
+    import argparse
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-o", "--out", type=str, default=None)
+
+    parser.add_argument("-id", "--illusid", type=int, default=None)
+    parser.add_argument("--name", type=str, default='artwork')
+
+    parser.add_argument("-s", "--search", type=str)
+    parser.add_argument("-n", "--number", type=int)
+
+    parser.add_argument("--s_mode", type=str, default='partial')
+    parser.add_argument("--mode", type=str, default='all')
+    parser.add_argument("-d", "--direct_download", action="store_true")
+
+    args = parser.parse_args()
+
+    main(args)
+
+
     # p = Pixiv()
     # url = p.get_url_by_illusid(86138069)
     # p.download(86138069, 'hhh', '.')
@@ -289,50 +358,3 @@ if __name__ == '__main__':
     # env = os.environ['PATH']
     # print(path)
     # print(env)
-
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-s", "--search", type=str)
-    parser.add_argument("-n", "--number", type=int)
-    parser.add_argument("-o", "--out", type=str, default=None)
-
-    parser.add_argument("--s_mode", type=str, default='partial')
-    parser.add_argument("--mode", type=str, default='all')
-    parser.add_argument("-d", "--direct_download", action="store_true")
-
-    args = parser.parse_args()
-
-    parameters = {}
-    if args.s_mode == 'title':
-        parameters['s_mode'] = 's_tc'
-    elif args.s_mode == 'perfect':
-        pass
-    else:
-        parameters['s_mode'] = 's_tag'
-
-    if args.mode == 'safe':
-        parameters['mode'] = 'safe'
-    elif args.mode == 'r18':
-        parameters['mode'] = 'r18'
-    else:
-        pass
-
-    pixiv = Pixiv('chrome')
-    artworks = pixiv.search(args.search, args.number, parameters=parameters)
-
-    if not args.direct_download:
-        while True:
-            ans = input('Sure to download? [y/n]\n')
-            if ans in ['y', 'n']:
-                break
-        if ans == 'n':
-            pixiv.__del__()
-            exit(0)
-
-    if args.out is None:
-        out_dir = '../' + args.search
-    else:
-        out_dir = args.out
-
-    pixiv.download(artworks, out_dir)
