@@ -47,6 +47,11 @@ class Pixiv(object):
             options.add_argument('log-level=3')
             self.web_driver = webdriver.Firefox(options=options)
 
+        # status parameters
+        self.total = 1
+        self.progress = 0
+        self.status_lock = Lock()
+
     def __del__(self):
         self.web_driver.close()
 
@@ -143,7 +148,7 @@ class Pixiv(object):
         return url
 
     def _download(self, illusid, name, path):
-        self.print_(STD_INFO + 'start downloading ' + name)
+        # self.print_(STD_INFO + 'start downloading ' + name)
         url = self.get_url_by_illusid(illusid)
         try:
             response = self.get_page(url)['response']
@@ -161,9 +166,31 @@ class Pixiv(object):
         file_path = '{}/{}_id_{}{}'.format(path, str(name), str(illusid), image_type)
         with open(file_path, 'wb') as f:
             f.write(bytestream)
+        # log progress
+        self.status_lock.acquire()
+        self.progress += 1
+        percent = colored('[%3d%%] ' % (self.progress/self.total*100), 'green')
+        print_("\r{0}progress: {1} / {2} | {3}                                  "
+               .format(percent, self.progress, self.total, name),
+               end='')
+        self.status_lock.release()
 
     def download(self, artworks: dict, path, max_workers=10):
+        if len(artworks) is 0:
+            print_(STD_WARNING + 'no artwork to be downloaded, return')
+            return
+
         self.print_(STD_INFO + 'start downloading ' + str(len(artworks)) + ' items...')
+
+        # reset and log progress
+        self.status_lock.acquire()
+        self.progress = 0
+        self.total = len(artworks)
+        percent = colored('[%3d%%] ' % (self.progress/self.total*100), 'green')
+        print_("\r{0}progress: {1} / {2}                                        "
+               .format(percent, self.progress, self.total), end='')
+        self.status_lock.release()
+
         mkdir_(path)
         threads = []
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -171,7 +198,7 @@ class Pixiv(object):
                 threads.append(executor.submit(self._download, illusid, artworks[illusid], path))
             for task in as_completed(threads):
                 pass
-        self.print_(STD_INFO + 'download finished ')
+        self.print_('\n' + STD_INFO + 'download finished ')
 
     @staticmethod
     def get_artworks_from_page(html):
@@ -243,7 +270,7 @@ def main(args):
     # download by id
     if args.illusid is not None:
         if args.out is None:
-            out_dir = './'
+            out_dir = '../'
         else:
             out_dir = args.out
         pixiv.download({args.illusid: args.name}, out_dir)
@@ -276,7 +303,7 @@ def main(args):
             return
 
     if args.out is None:
-        out_dir = './' + args.search
+        out_dir = '../' + args.search
     else:
         out_dir = args.out
 
@@ -284,7 +311,6 @@ def main(args):
 
 
 if __name__ == '__main__':
-
 
     import argparse
 
@@ -305,6 +331,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
+
+
+
 
 
     # p = Pixiv()

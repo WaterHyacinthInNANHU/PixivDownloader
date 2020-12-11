@@ -27,12 +27,12 @@ logging.basicConfig(
 print_lock = Lock()
 
 
-def print_(info):
+def print_(info, **kwargs):
     """
     thread printing
     :param info: message to be printed
     :return: None
     """
     print_lock.acquire()
-    print(info)
+    print(info, **kwargs)
     print_lock.release()
