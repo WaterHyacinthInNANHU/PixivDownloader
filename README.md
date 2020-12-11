@@ -69,7 +69,7 @@ python src/pixiv.py -s "stein gate 1000users入り" -n 100 -o "./artworks" --s_m
 Download the artworks with illusid: 78396392 under ```./art```
 
 ```bash
-python pixiv.py -id 78396392 --name artwork -o art
+python src/pixiv.py -id 78396392 --name artwork -o art
 ```
 
 ## Note
