@@ -48,7 +48,7 @@ Search for 100 artworks related to "stein gate 1000users入り" and download the
 python src/pixiv.py -s "stein gate 1000users入り" -n 100 -d
 ```
 
-Search for 100 artworks perfect perfectly matched with "stein gate 1000users入り"  for all ages and save it under "./artworks".
+Search for 100 artworks perfectly matched with "stein gate 1000users入り"  for all ages and save it under "./artworks".
 
 ```bash
 python src/pixiv.py -s "stein gate 1000users入り" -n 100 -o "./artworks" --s_mode perfect --mode safe
