@@ -243,7 +243,7 @@ def main(args):
     # download by id
     if args.illusid is not None:
         if args.out is None:
-            out_dir = '../'
+            out_dir = './'
         else:
             out_dir = args.out
         pixiv.download({args.illusid: args.name}, out_dir)
@@ -276,7 +276,7 @@ def main(args):
             return
 
     if args.out is None:
-        out_dir = '../' + args.search
+        out_dir = './' + args.search
     else:
         out_dir = args.out
 
