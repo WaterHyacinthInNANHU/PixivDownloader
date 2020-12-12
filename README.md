@@ -25,33 +25,45 @@ Open terminal under root folder of the project:
 **Search and download**
 
 ```bash
-python src/pixiv.py [-h] [-o OUT] [-s SEARCH] [-n NUMBER] [--s_mode S_MODE] [--mode MODE] [-d]
+python src/pixiv.py [-o OUT] [-s SEARCH] [-n NUMBER] [--s_mode S_MODE] [--mode MODE] [-d] [-ori]
 ```
 
-- -s:	what you want to search for.
-- -n:	number of results you want to get.
-- -o:	the folder to save artworks; default by a dictionary named by the term you searched for under root folder of project.
-- --s_mode:	matching option; default by partial matching; ```title``` for title matching; ```perfect``` for perfect matching.
-- --mode:	age limitation; default by no limit; ```safe``` for ALL AGE; ```r18``` for R18 ONLY
-- -d:	directly download searched results without asking for confirmation.
+*necessary*
 
-**Download via illusid**
+- -s: what you want to search for.
+- -n: number of results you want to get.
+
+*optional*
+
+- -o: the folder to save artworks; default by a dictionary named by the term you searched for under root folder of project. 
+- --s_mode: matching option; ```perfect``` for perfect matching; default by partial matching; ```title``` for title matching;.
+- --mode: age limitation; ```safe``` for ALL AGE; ```r18``` for R18 ONLY; default by no limit.
+- -d: flag, set to directly download searched results without asking for confirmation.
+- -ori: flag, set to download original picture(.png), otherwise download compressed picture(.jpg).
+
+**Download via id**
 
 ```bash
-python src/pixiv.py [-h] [-o OUT] [-id ILLUSID] [--name NAME]
+python src/pixiv.py [-o OUT] [-id ILLUSID] [--name NAME] [-m] [-ori]
 ```
 
-- -o:	the folder to save artworks; default by root folder of project.
-- -id:	the illusid of the artwork you want to download.
+*necessary*
 
-- -- name:	a string to name the downloaded artwork.
+- -id: the id of the artwork you want to download.
+
+*optional*
+
+- -o: the folder to save artworks; default by root folder of project.
+- --name: a string to name the downloaded artwork; default by ```artwork```
+- -m; the number of painting contained by the target artwork with identical id; default by 1.
+- -ori: flag, set to download original picture(.png); default by downloading compressed picture(.jpg).
 
 ## Examples
 
-Search for 100 artworks related to "stein gate 1000users入り".
+Search for 100 artworks related to "stein gate 1000users入り" in png format.
 
 ```bash
-python src/pixiv.py -s "stein gate 1000users入り" -n 100
+python src/pixiv.py -s "stein gate 1000users入り" -n 100 -ori
 ```
 
 Search for 100 artworks related to "stein gate 1000users入り" and download them without asking for confirmation.
@@ -66,10 +78,16 @@ Search for 100 artworks perfectly matched with "stein gate 1000users入り"  for
 python src/pixiv.py -s "stein gate 1000users入り" -n 100 -o "./artworks" --s_mode perfect --mode safe
 ```
 
-Download the artworks with illusid: 78396392 under ```./art```
+Download the artworks with id: 78396392 under ```./art```
 
 ```bash
 python src/pixiv.py -id 78396392 --name artwork -o art
+```
+
+Download the artworks with id: 82733226 under ```./art``` which contains 26 paintings.
+
+```bash
+python src/pixiv.py -id 82733226 --name artwork -o art -m 26
 ```
 
 ## Note
