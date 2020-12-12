@@ -248,7 +248,6 @@ class Pixiv(object):
         :return: a dictionary {illusid: number of paintings, }
         """
         svgs = re.findall(r'</svg></span>(.*?)</a></div>', html, re.S)
-        print(len(svgs))
         if len(svgs) is 0:
             return {}
         multi_artworks = {}
@@ -260,7 +259,6 @@ class Pixiv(object):
             if len(number) is 0:
                 continue
             multi_artworks[illusid[0]] = number[0]
-        print(len(multi_artworks))
         return multi_artworks
 
     def search(self, search_term: str, number, artwork_type: str = 'artworks', parameters: dict = None, max_retries=3):
