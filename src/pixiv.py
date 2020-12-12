@@ -216,7 +216,7 @@ class Pixiv(object):
             artworks[illusid] = name
         return artworks
 
-    def search(self, search_term: str, number, artwork_type: str = 'artworks', parameters: dict = None, retries=3):
+    def search(self, search_term: str, number, artwork_type: str = 'artworks', parameters: dict = None, max_retries=3):
         self.print_(STD_INFO + 'start searching...')
         if number == 'ALL':  # download all
             number = float('inf')
@@ -229,6 +229,7 @@ class Pixiv(object):
         artworks = {}
         page_number = 0
         while True:
+            retries = max_retries
             page_number += 1
             url = 'https://www.pixiv.net/tags/' + parse.quote(search_term) + '/' + artwork_type + '?' + para + '&' + \
                   'p=' + str(page_number)
@@ -270,7 +271,7 @@ def main(args):
     # download by id
     if args.illusid is not None:
         if args.out is None:
-            out_dir = '../'
+            out_dir = './'
         else:
             out_dir = args.out
         pixiv.download({args.illusid: args.name}, out_dir)
@@ -303,7 +304,7 @@ def main(args):
             return
 
     if args.out is None:
-        out_dir = '../' + args.search
+        out_dir = './' + args.search
     else:
         out_dir = args.out
 
