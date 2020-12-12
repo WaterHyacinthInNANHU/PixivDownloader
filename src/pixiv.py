@@ -130,16 +130,14 @@ class Pixiv(object):
                 self.web_driver.get(url)
             except Exception:
                 raise PageIsNotAvailableError
-            return {'html': self.web_driver.page_source,
-                    'soup': BeautifulSoup(self.web_driver.page_source, features='lxml'), 'code': 200}
+            return {'html': self.web_driver.page_source, 'code': 200}
         else:
             r = self._session_get(url)
             if r.status_code is not 200:
                 raise PageIsNotAvailableError
-            return {'html': r.text, 'response': r, 'soup': BeautifulSoup(r.text, features='lxml'),
-                    'code': r.status_code}
+            return {'html': r.text, 'response': r, 'code': r.status_code}
 
-    def get_url_by_illusid(self, illusid: int, number_of_paintings, original=True):
+    def get_url_by_illusid(self, illusid, number_of_paintings: int, original=True):
         """
         get urls via illusid
         :param illusid: illusid
@@ -190,13 +188,13 @@ class Pixiv(object):
         self.status_lock.acquire()
         self.progress += 1
         percent = colored('[%3d%%] ' % (self.progress / self.total * 100), 'green')
-        print_(("\r{0}progress: {1} / {2} | {3}" + ' '*50).format(percent, self.progress, self.total, name),
-               end='')
+        self.print_(("\r{0}progress: {1} / {2} | {3}" + ' ' * 50).format(percent, self.progress, self.total, name),
+                    end='')
         self.status_lock.release()
 
     def download(self, artworks: dict, multi_artworks: dict, path, original=True, max_workers=10):
         if len(artworks) is 0:
-            print_(STD_WARNING + 'no artwork to be downloaded, return')
+            self.print_(STD_WARNING + 'no artwork to be downloaded, return')
             return
 
         self.print_(STD_INFO + 'start downloading ' + str(len(artworks)) + ' items...')
@@ -206,7 +204,7 @@ class Pixiv(object):
         self.progress = 0
         self.total = len(artworks)
         percent = colored('[%3d%%] ' % (self.progress / self.total * 100), 'green')
-        print_("\r{0}progress: {1} / {2} |".format(percent, self.progress, self.total), end='')
+        self.print_("\r{0}progress: {1} / {2} |".format(percent, self.progress, self.total), end='')
         self.status_lock.release()
 
         mkdir_(path)
@@ -215,7 +213,7 @@ class Pixiv(object):
             for illusid in artworks:
                 # check multiple-painting artworks
                 if illusid in multi_artworks:
-                    number_of_paintings = multi_artworks[illusid]
+                    number_of_paintings = int(multi_artworks[illusid])
                 else:
                     number_of_paintings = 1
                 threads.append(
@@ -247,19 +245,54 @@ class Pixiv(object):
         :param html: page
         :return: a dictionary {illusid: number of paintings, }
         """
-        svgs = re.findall(r'</svg></span>(.*?)</a></div>', html, re.S)
-        if len(svgs) is 0:
+        blocks = re.findall(r'</svg></span>(.*?)</a></div>', html, re.S)
+        if len(blocks) is 0:
             return {}
         multi_artworks = {}
-        for svg in svgs:
-            illusid = re.findall(r'artworks/(.*?)>', svg)
+        for block in blocks:
+            illusid = re.findall(r'artworks/(.*?)\">', block)
             if len(illusid) is 0:
                 continue
-            number = re.findall(r'<span>(.*?)</span></div>', svg)
+            number = re.findall(r'<span>(.*?)</span></div>', block)
             if len(number) is 0:
                 continue
             multi_artworks[illusid[0]] = number[0]
         return multi_artworks
+
+    @staticmethod
+    def get_total_number_from_page(html):
+        """
+        get total number of artworks
+        :param html: page
+        :return: total number of artworks/None for no artwork
+        """
+        # block = re.findall(r'<iframe marginwidth(.*?)button type=\"submit\"', html, re.S)
+        # if len(block) is 0:
+        #     return None
+        # print(block)
+        # block = re.findall(r'<span class.*?></span></div><div class(.*?)</span><span class=', block[0], re.S)
+        # # block = re.findall(r'</span></div></div><div(.*?)</span', block[0], re.S)
+        # if len(block) is 0:
+        #     return None
+        # print(block)
+        # block = re.findall(r'<span class.*?>(\d+)', block[0], re.S)
+        # if len(block) is 0:
+        #     return None
+        # print(block)
+        # return block[0]
+        try:
+            soup = BeautifulSoup(html, features='lxml')
+            soup = soup.find('div', id='root')
+            soup = soup.findChildren('div')[1]
+            soup = soup.findChild('div')
+            soup = soup.find_next_sibling()
+            for _ in range(4):
+                soup = soup.findChild('div')
+            soup = soup.find_next_sibling()
+            soup = soup.find_all('span')[0]
+            return int(soup.text.replace(',', ''))
+        except AttributeError or ValueError:  # no artwork
+            return None
 
     def search(self, search_term: str, number, artwork_type: str = 'artworks', parameters: dict = None, max_retries=3):
         self.print_(STD_INFO + 'start searching...')
@@ -277,47 +310,66 @@ class Pixiv(object):
         artworks = {}
         multi_artworks = {}  # a look-up dictionary, mark the artworks that have multiple paintings
         page_number = 0
+        first_time_flag = True
         while True:
             retries = max_retries
             page_number += 1
+
+            # fetch page
             url = 'https://www.pixiv.net/tags/' + parse.quote(search_term) + '/' + artwork_type + '?' + para + '&' + \
                   'p=' + str(page_number)
             self.print_(STD_INFO + 'fetching ' + url)
             while True:
-                page = self.get_page(url, use_selenium=True)
-                new_artworks = self.get_artworks_from_page(page['html'])
-                new_multi_artworks = self.get_multi_artworks_from_page(page['html'])
+                page = self.get_page(url, use_selenium=True)['html']
+                new_artworks = self.get_artworks_from_page(page)
+                new_multi_artworks = self.get_multi_artworks_from_page(page)
 
                 # check for termination or retry
                 if new_artworks == {}:
-                    self.print_(STD_WARNING + 'insufficient artworks, retry')
+                    self.print_(STD_WARNING + 'insufficient new artworks, retry')
                 else:
                     break
                 retries -= 1
                 if retries == 0:
-                    self.print_(STD_WARNING + 'insufficient artworks, ' + str(
-                        len(artworks)) + ' artworks have been found, return.')
+                    if first_time_flag:
+                        self.print_(STD_ERROR + 'no related artworks were found, please retry or check terms you '
+                                                'searched')
+                        return artworks, multi_artworks
+                    self.print_(STD_WARNING + 'insufficient new artworks, ' + str(
+                        len(artworks)) + ' artworks have been collected.')
                     return artworks, multi_artworks
+
+            # get max number of artworks
+            max_number = self.get_total_number_from_page(page)
 
             # check artworks's length, if surpassed the specific length, randomly pop items from new_artworks
             length = len(artworks)
             new_length = len(new_artworks)
             if length + new_length > number:
-                for _ in range(length - number):
-                    artworks.pop(choice(list(new_artworks.keys())))
+                for _ in range(length + new_length - number):
+                    new_artworks.pop(choice(list(new_artworks.keys())))
 
             # merge artworks and new_artworks, so is multi_artworks
-            self.print_(STD_INFO + str(len(new_artworks)) + ' new artworks have been found. ')
+            if first_time_flag:
+                if max_number is not None:
+                    self.print_(STD_INFO + str(max_number) + ' artworks were found in total.')
+            self.print_(STD_INFO + str(len(new_artworks)) + ' new artworks have been collected. ')
             artworks = self.merge_two_dicts(new_artworks, artworks)
             multi_artworks = self.merge_two_dicts(new_multi_artworks, multi_artworks)
-            self.print_(STD_INFO + str(len(artworks)) + ' artworks have been found for now.')
+            self.print_(STD_INFO + str(len(artworks)) + ' artworks have been collected for now.')
 
-            # terminate
+            # check for termination
             length = len(artworks)
             if length >= number:
                 break
+            if max_number is not None:
+                if length >= max_number:
+                    break
 
-        self.print_(STD_INFO + str(len(artworks)) + ' artworks have been found, search completed.')
+            if first_time_flag:
+                first_time_flag = False
+
+        self.print_(STD_INFO + str(len(artworks)) + ' artworks have been collected, search completed.')
         return artworks, multi_artworks
 
 
@@ -351,6 +403,7 @@ def main(args_):
         pass
 
     artworks, multi_artworks = pixiv.search(args_.search, args_.number, parameters=parameters)
+    print(multi_artworks)
 
     if not args_.direct_download:
         while True:
@@ -385,7 +438,7 @@ if __name__ == '__main__':
     parser.add_argument("--s_mode", type=str, default='partial')
     parser.add_argument("--mode", type=str, default='all')
     parser.add_argument("-d", "--direct_download", action="store_true")
-    parser.add_argument("-ori", "--original", action='store_true')
+    parser.add_argument("-ori", "--original", action='store_false')
 
     args = parser.parse_args()
 
@@ -406,21 +459,22 @@ if __name__ == '__main__':
     # url = p.get_url_by_illusid(86138069)
 
     # p = Pixiv('chrome')
-    # url = ''
+    # url = 'https://www.pixiv.net/en/tags/arknights%205000users/artworks?s_mode=s_tag'
     # page = p.get_page(url, use_selenium=True)['html']
     # with open('page.html', 'w', encoding='utf-8') as f:
     #     f.write(page)
-
-    # p = Pixiv()
-    # with open('page.html', 'r', encoding='utf-8') as f:
-    #     page = f.read()
-    # artworks = p.get_artworks_from_page(page)
-    # print(artworks)
-
+    #
+    # # p = Pixiv()
+    # # with open('page.html', 'r', encoding='utf-8') as f:
+    # #     page = f.read()
+    # # artworks = p.get_artworks_from_page(page)
+    # # print(artworks)
+    #
     # with open('page.html', 'r', encoding='utf-8') as f:
     #     page = f.read()
     # # artworks = Pixiv.get_multi_artworks_from_page(page)
-    # artworks = Pixiv.get_artworks_from_page(page)
+    # # artworks = Pixiv.get_artworks_from_page(page)
+    # artworks = Pixiv.get_total_number_from_page(page)
     # print(artworks)
 
     # p = Pixiv('chrome')
@@ -447,3 +501,7 @@ if __name__ == '__main__':
     # env = os.environ['PATH']
     # print(path)
     # print(env)
+
+    # p = Pixiv()
+    # url = p.get_url_by_illusid('84566199', 2, original=False)
+    # print(url)
