@@ -503,7 +503,7 @@ if __name__ == '__main__':
         exceptions = pixiv.download(artworks, multi_artworks, out_dir)
 
         if len(exceptions) is not 0:
-            print_(STD_ERROR + 'following exceptions occurred when downloading ')
+            # print_(STD_ERROR + 'following exceptions occurred when downloading ')
             with open('exceptions_log.txt', 'w') as f:
                 for e in exceptions:
                     print_exceptions_to_file(e, f)
