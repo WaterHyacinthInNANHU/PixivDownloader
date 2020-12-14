@@ -90,6 +90,10 @@ Download the artworks with id: 82733226 under ```./art``` which contains 26 pain
 python src/pixiv.py -id 82733226 --name artwork -o art -m 26
 ```
 
+## Demo
+
+![Capture](Capture.png)
+
 ## Note
 
 - Must have chrome installed on your device.

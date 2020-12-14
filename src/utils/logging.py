@@ -62,10 +62,10 @@ class ProgressBar(object):
         integer = int(points / 10)
         decimal = points % 10
         if points != 1000:
-            print_("{}progress:| {}{}{} | {} / {} |".format(percent, '#'*integer, decimal, '-'*(99-integer), n,
-                                                            total), end='\r')
+            print_("\r{}progress:| {}{}{} | {} / {} |".format(percent, '#'*integer, decimal, '-'*(99-integer), n,
+                                                              total), end='')
         else:
-            print_("{}progress:| {} | {} / {} |".format(percent, '#' * 100, n, total))
+            print_("\r{}progress:| {} | {} / {} |".format(percent, '#' * 100, n, total))
 
     def reset(self, total: int = None):
         self.lock.acquire()
