@@ -38,6 +38,14 @@ def print_(info, **kwargs):
     print_lock.release()
 
 
+def print_exceptions(ex: Exception) -> None:
+    print_('{0}: {1}'.format(ex.__class__.__name__, ex))
+
+
+def print_exceptions_to_file(ex: Exception, file) -> None:
+    print_('{0}: {1}'.format(ex.__class__.__name__, ex), file=file)
+
+
 class ProgressBar(object):
     def __init__(self, total: int = 100, initial: int = 0):
         self.total = total
@@ -65,7 +73,7 @@ class ProgressBar(object):
             print_("\r{}progress:| {}{}{} | {} / {} |".format(percent, '#'*integer, decimal, '-'*(99-integer), n,
                                                               total), end='')
         else:
-            print_("\r{}progress:| {} | {} / {} |".format(percent, '#' * 100, n, total))
+            print_("\r{}progress:| {} | {} / {} |\n".format(percent, '#' * 100, n, total))
 
     def reset(self, total: int = None):
         self.lock.acquire()

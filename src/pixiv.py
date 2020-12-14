@@ -13,7 +13,7 @@ from urllib import parse
 from random import choice
 from concurrent.futures import ThreadPoolExecutor
 # from tqdm import tqdm
-# from concurrent.futures import as_completed
+from concurrent.futures import as_completed
 # import traceback
 from time import sleep
 
@@ -231,7 +231,7 @@ class Pixiv(object):
         :param path: path to save
         :param original: flag, set to download original pictures
         :param max_workers: max workers of threading pool
-        :return: None
+        :return: a list of exceptions returned by threads
         """
         if len(artworks) is 0:
             self.print_(STD_WARNING + 'no artwork to be downloaded, return')
@@ -255,12 +255,16 @@ class Pixiv(object):
                     executor.submit(self._download, illusid, artworks[illusid], number_of_paintings, path, original))
 
             # handle exceptions
-            # for task in as_completed(threads):
-            #     try:
-            #         _ = task.result()
-            #     except Exception as _:
-            #         traceback.print_exc(limit=1)
+            exceptions = []
+            for task in as_completed(threads):
+                try:
+                    _ = task.result()
+                except Exception as _:
+                    # traceback.print_exc(limit=1)
+                    exceptions.append(_)
+                    self.p_bar.update()
         self.print_(STD_INFO + 'download finished ')
+        return exceptions
 
     @staticmethod
     def get_artworks_from_page(html: str):
@@ -428,76 +432,82 @@ class Pixiv(object):
         return artworks, multi_artworks
 
 
-def get_args():
-    import argparse
+if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser()
+    def get_args():
+        import argparse
 
-    parser.add_argument("-o", "--out", type=str, default=None)
+        parser = argparse.ArgumentParser()
 
-    parser.add_argument("-id", "--illusid", type=int, default=None)
-    parser.add_argument("--name", type=str, default='artwork')
-    parser.add_argument("-m", "--number_of_paintings", type=int, default=1)
+        parser.add_argument("-o", "--out", type=str, default=None)
 
-    parser.add_argument("-s", "--search", type=str)
-    parser.add_argument("-n", "--number", type=int)
+        parser.add_argument("-id", "--illusid", type=int, default=None)
+        parser.add_argument("--name", type=str, default='artwork')
+        parser.add_argument("-m", "--number_of_paintings", type=int, default=1)
 
-    parser.add_argument("--s_mode", type=str, default='partial')
-    parser.add_argument("--mode", type=str, default='all')
-    parser.add_argument("-d", "--direct_download", action="store_true")
-    parser.add_argument("-ori", "--original", action='store_true')
+        parser.add_argument("-s", "--search", type=str)
+        parser.add_argument("-n", "--number", type=int)
 
-    return parser.parse_args()
+        parser.add_argument("--s_mode", type=str, default='partial')
+        parser.add_argument("--mode", type=str, default='all')
+        parser.add_argument("-d", "--direct_download", action="store_true")
+        parser.add_argument("-ori", "--original", action='store_true')
+
+        return parser.parse_args()
 
 
-def main(args_):
-    pixiv = Pixiv('chrome')
+    def main(args_):
+        pixiv = Pixiv('chrome')
 
-    # download by id
-    if args_.illusid is not None:
-        if args_.out is None:
-            out_dir = './'
-        else:
-            out_dir = args_.out
-        pixiv.download({args_.illusid: args_.name}, {args_.illusid: args_.number_of_paintings}, out_dir,
-                       original=args_.original)
-        return
-
-    # search and download
-    parameters = {}
-    if args_.s_mode == 'title':
-        parameters['s_mode'] = 's_tc'
-    elif args_.s_mode == 'perfect':
-        pass
-    else:
-        parameters['s_mode'] = 's_tag'
-
-    if args_.mode == 'safe':
-        parameters['mode'] = 'safe'
-    elif args_.mode == 'r18':
-        parameters['mode'] = 'r18'
-    else:
-        pass
-
-    artworks, multi_artworks = pixiv.search(args_.search, args_.number, parameters=parameters)
-
-    if not args_.direct_download:
-        while True:
-            ans = input('Sure to download? [y/n]\n')
-            if ans in ['y', 'n']:
-                break
-        if ans == 'n':
+        # download by id
+        if args_.illusid is not None:
+            if args_.out is None:
+                out_dir = './'
+            else:
+                out_dir = args_.out
+            pixiv.download({args_.illusid: args_.name}, {args_.illusid: args_.number_of_paintings}, out_dir,
+                           original=args_.original)
             return
 
-    if args_.out is None:
-        out_dir = './' + args_.search
-    else:
-        out_dir = args_.out
+        # search and download
+        parameters = {}
+        if args_.s_mode == 'title':
+            parameters['s_mode'] = 's_tc'
+        elif args_.s_mode == 'perfect':
+            pass
+        else:
+            parameters['s_mode'] = 's_tag'
 
-    pixiv.download(artworks, multi_artworks, out_dir)
+        if args_.mode == 'safe':
+            parameters['mode'] = 'safe'
+        elif args_.mode == 'r18':
+            parameters['mode'] = 'r18'
+        else:
+            pass
 
+        artworks, multi_artworks = pixiv.search(args_.search, args_.number, parameters=parameters)
 
-if __name__ == '__main__':
+        if not args_.direct_download:
+            while True:
+                ans = input('Sure to download? [y/n]\n')
+                if ans in ['y', 'n']:
+                    break
+            if ans == 'n':
+                return
+
+        if args_.out is None:
+            out_dir = './' + args_.search
+        else:
+            out_dir = args_.out
+
+        exceptions = pixiv.download(artworks, multi_artworks, out_dir)
+
+        if len(exceptions) is not 0:
+            print_(STD_ERROR + 'following exceptions occurred when downloading ')
+            with open('exceptions_log.txt', 'w') as f:
+                for e in exceptions:
+                    print_exceptions_to_file(e, f)
+
     args = get_args()
     main(args)
 
