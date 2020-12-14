@@ -94,6 +94,8 @@ python src/pixiv.py -id 82733226 --name artwork -o art -m 26
 
 ![Capture](images/Capture.PNG)
 
+![result](images/Capture2.PNG)
+
 ## Note
 
 - Must have chrome installed on your device.
