@@ -15,7 +15,7 @@ This is a scrap project to search and download artworks from pixiv.net
 pip install -r src/requirements.txt
 ```
 
-- Download a [web driver](https://sites.google.com/a/chromium.org/chromedriver/downloads) according to your chrome version ([how can I get the version of my chrome browser?](https://www.businessinsider.com/what-version-of-google-chrome-do-i-have?r=DE&IR=T)) and replace the driver in ```src/driver/```  with your own.
+- Download a [web driver](https://sites.google.com/a/chromium.org/chromedriver/downloads) according to your chrome version ([how can I get the version of my chrome browser?](https://www.businessinsider.com/what-version-of-google-chrome-do-i-have?r=DE&IR=T)) and save the it under ```src/driver/```.
 - Log in [pixiv](www.pixiv.net) using your chrome browser with your own account for once.
 
 ## Usage
