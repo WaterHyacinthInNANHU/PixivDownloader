@@ -8,3 +8,8 @@ class BrowserTypeError(Exception):
 
 class InsufficientArtworks(Exception):
     pass
+
+
+class PageFailedToRespond(Exception):
+    pass
+

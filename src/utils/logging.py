@@ -36,3 +36,47 @@ def print_(info, **kwargs):
     print_lock.acquire()
     print(info, **kwargs)
     print_lock.release()
+
+
+class ProgressBar(object):
+    def __init__(self, total: int = 100, initial: int = 0):
+        self.total = total
+        self.initial = initial
+        self.n = 0
+        self.colour = 'green'
+        self.lock = Lock()
+
+    def set_colour(self, colour: str):
+        self.lock.acquire()
+        self.colour = colour
+        self.lock.release()
+
+    def display(self):
+        self.lock.acquire()
+        n = self.n
+        total = self.total
+        colour = self.colour
+        self.lock.release()
+        points = int(n / total * 1000)
+        percent = colored('[%3d%%] ' % int(points / 10), colour)
+        integer = int(points / 10)
+        decimal = points % 10
+        if points != 1000:
+            print_("{}progress:| {}{}{} | {} / {} |".format(percent, '#'*integer, decimal, '-'*(99-integer), n,
+                                                            total), end='\r')
+        else:
+            print_("{}progress:| {} | {} / {} |".format(percent, '#' * 100, n, total))
+
+    def reset(self, total: int = None):
+        self.lock.acquire()
+        self.n = 0
+        if total is not None:
+            self.total = total
+        self.lock.release()
+
+    def update(self, n: int = 1):
+        self.lock.acquire()
+        if self.n < self.total:
+            self.n += n
+        self.lock.release()
+        self.display()

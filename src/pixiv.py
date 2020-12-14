@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import requests
+from requests.adapters import HTTPAdapter
 import re
 import signal
 from utils.check_image import check_png_stream, check_jpg_jpeg_stream
@@ -11,6 +12,15 @@ from selenium import webdriver
 from urllib import parse
 from random import choice
 from concurrent.futures import ThreadPoolExecutor
+# from tqdm import tqdm
+# from concurrent.futures import as_completed
+# import traceback
+from time import sleep
+
+# parameters
+NUMBER_OF_WORKERS = 20
+SIZE_OF_CONNECTIONS_POOL = NUMBER_OF_WORKERS
+REQUEST_INTERVAL = 0.050
 
 
 class Pixiv(object):
@@ -30,10 +40,18 @@ class Pixiv(object):
         }
         self.print_ = print__
         self.cookies = self.load_cookies(browser)
+
         self.session = requests.Session()
+        # about pool_connections and pool_maxsize,
+        # refer to: https://laike9m.com/blog/requests-secret-pool_connections-and-pool_maxsize,89/
+        adapter = HTTPAdapter(pool_connections=10, pool_maxsize=SIZE_OF_CONNECTIONS_POOL)
+        self.session.mount('https://', adapter)
+        self.session.mount('http://', adapter)
         self.session.cookies = self.cookies
         self.session.headers = self.headers
+
         self.set_environment_variable()
+
         if browser == 'chrome':
             options = webdriver.ChromeOptions()
             options.add_argument('--headless')
@@ -46,10 +64,9 @@ class Pixiv(object):
             options.add_argument('log-level=3')
             self.web_driver = webdriver.Firefox(options=options)
 
-        # status parameters
-        self.total = 1
-        self.progress = 0
-        self.status_lock = Lock()
+        self.p_bar = ProgressBar()
+
+        self._session_get_lock = Lock()
 
     def __del__(self):
         self.web_driver.close()
@@ -74,7 +91,7 @@ class Pixiv(object):
         )
 
     @staticmethod
-    def load_cookies_from_txt(cookie_path):
+    def load_cookies_from_txt(cookie_path: str):
         cookies = {}
         with open(cookie_path, 'r') as file:
             content = file.read()
@@ -88,7 +105,7 @@ class Pixiv(object):
         return cookies
 
     @staticmethod
-    def load_cookies(browser):
+    def load_cookies(browser: str):
         if browser == 'chrome':
             cookies = browser_cookie3.chrome(domain_name=Pixiv.domain)
         elif browser == 'firefox':
@@ -108,13 +125,23 @@ class Pixiv(object):
         last_connection_exception = None
         while retries:
             try:
+                self._session_get_lock.acquire()
+                sleep(REQUEST_INTERVAL)
+                self._session_get_lock.release()
                 return self.session.get(url, **kwargs)
             except requests.exceptions.ConnectionError as e:
                 last_connection_exception = e
                 retries -= 1
         raise last_connection_exception
 
-    def get_page(self, url: str, cookies=None, use_selenium=False):
+    def get_page(self, url: str, cookies=None, use_selenium: bool = False):
+        """
+        get page from url
+        :param url: url
+        :param cookies: cookies
+        :param use_selenium: flag, set to use selenium to load page
+        :return: a dictionary containing text of html and status code   (and response object returned by session.get)
+        """
         if cookies is None:
             cookies = self.cookies
         if use_selenium:
@@ -137,7 +164,7 @@ class Pixiv(object):
                 raise PageIsNotAvailableError
             return {'html': r.text, 'response': r, 'code': r.status_code}
 
-    def get_url_by_illusid(self, illusid, number_of_paintings: int, original=True):
+    def get_url_by_illusid(self, illusid: str, number_of_paintings: int, original: bool = True):
         """
         get urls via illusid
         :param illusid: illusid
@@ -157,25 +184,34 @@ class Pixiv(object):
             urls += [url]
         return urls
 
-    def _download(self, illusid, name, number_of_paintings, path, original):
+    def _download(self, illusid: str, name: str, number_of_paintings: int, path: str, original: bool):
+        """
+        threading download callback function
+        :param illusid: illusid
+        :param name: name of the artwork
+        :param number_of_paintings: number of paintings in identical artwork
+        :param path: path to save
+        :param original: flag, set to download original picture
+        :return: None
+        """
         urls = self.get_url_by_illusid(illusid, number_of_paintings, original)
         if len(urls) > 1:
-            path += '/' + name
+            path = '{}/{}_id_{}'.format(path, str(name), str(illusid))
             mkdir_(path)
         for index, url in enumerate(urls):
             try:
                 response = self.get_page(url)['response']
-            except Exception:
-                self.print_(STD_ERROR + 'error occurred downloading ' + name + ' ' + url)
-                return
+            except PageFailedToRespond:
+                self.print_('\n' + STD_ERROR + 'error occurred downloading ' + name + ' ' + url)
+                continue
             bytestream = response.content
             if check_jpg_jpeg_stream(bytestream):
                 image_type = '.jpg'
             elif check_png_stream(bytestream):
                 image_type = '.png'
             else:
-                self.print_(STD_WARNING + 'unsupported format or broken file, drop: ' + name + ' ' + url)
-                return
+                self.print_('\n' + STD_WARNING + 'unsupported format or broken file, drop: ' + name + ' ' + url)
+                continue
             if index is not 0:
                 p = '_p{}'.format(index)
             else:
@@ -184,28 +220,27 @@ class Pixiv(object):
             with open(file_path, 'wb') as f:
                 f.write(bytestream)
 
-        # log progress
-        self.status_lock.acquire()
-        self.progress += 1
-        percent = colored('[%3d%%] ' % (self.progress / self.total * 100), 'green')
-        self.print_(("\r{0}progress: {1} / {2} | {3}" + ' ' * 50).format(percent, self.progress, self.total, name),
-                    end='')
-        self.status_lock.release()
+        self.p_bar.update()
 
-    def download(self, artworks: dict, multi_artworks: dict, path, original=True, max_workers=10):
+    def download(self, artworks: dict, multi_artworks: dict, path: str, original: bool = True,
+                 max_workers: int = NUMBER_OF_WORKERS):
+        """
+        run download threads
+        :param artworks: artworks
+        :param multi_artworks: a dictionary containing illusid with multiple artworks
+        :param path: path to save
+        :param original: flag, set to download original pictures
+        :param max_workers: max workers of threading pool
+        :return: None
+        """
         if len(artworks) is 0:
             self.print_(STD_WARNING + 'no artwork to be downloaded, return')
             return
 
         self.print_(STD_INFO + 'start downloading ' + str(len(artworks)) + ' items...')
 
-        # reset and log progress
-        self.status_lock.acquire()
-        self.progress = 0
-        self.total = len(artworks)
-        percent = colored('[%3d%%] ' % (self.progress / self.total * 100), 'green')
-        self.print_("\r{0}progress: {1} / {2} |".format(percent, self.progress, self.total), end='')
-        self.status_lock.release()
+        self.p_bar.reset(len(artworks))
+        self.p_bar.display()
 
         mkdir_(path)
         threads = []
@@ -218,12 +253,22 @@ class Pixiv(object):
                     number_of_paintings = 1
                 threads.append(
                     executor.submit(self._download, illusid, artworks[illusid], number_of_paintings, path, original))
+
+            # handle exceptions
             # for task in as_completed(threads):
-            #     pass
-        self.print_('\n' + STD_INFO + 'download finished ')
+            #     try:
+            #         _ = task.result()
+            #     except Exception as _:
+            #         traceback.print_exc(limit=1)
+        self.print_(STD_INFO + 'download finished ')
 
     @staticmethod
-    def get_artworks_from_page(html):
+    def get_artworks_from_page(html: str):
+        """
+        get artworks's name and illusid
+        :param html: page
+        :return: a dictionary containing illusids and corresponding names
+        """
         re_list = re.findall(r'artworks/(.*?)</a></div>', html)
         if len(re_list) == 1:
             if '<img src=' in re_list[0]:  # insufficient artworks
@@ -239,7 +284,7 @@ class Pixiv(object):
         return artworks
 
     @staticmethod
-    def get_multi_artworks_from_page(html):
+    def get_multi_artworks_from_page(html: str):
         """
         mark artworks that contain multiple paintings
         :param html: page
@@ -294,7 +339,17 @@ class Pixiv(object):
         except AttributeError or ValueError:  # no artwork
             return None
 
-    def search(self, search_term: str, number, artwork_type: str = 'artworks', parameters: dict = None, max_retries=3):
+    def search(self, search_term: str, number, artwork_type: str = 'artworks', parameters: dict = None,
+               max_retries: int = 3):
+        """
+        search for related artworks
+        :param search_term: searched terms
+        :param number: number of artworks to find
+        :param artwork_type: artwork's type
+        :param parameters: parameters
+        :param max_retries: max times to retry while loading a page
+        :return: a dictionary of artworks and a dictionary of artworks containing multiple paintings
+        """
         self.print_(STD_INFO + 'start searching...')
 
         if number == 'ALL':  # download all
@@ -373,6 +428,28 @@ class Pixiv(object):
         return artworks, multi_artworks
 
 
+def get_args():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-o", "--out", type=str, default=None)
+
+    parser.add_argument("-id", "--illusid", type=int, default=None)
+    parser.add_argument("--name", type=str, default='artwork')
+    parser.add_argument("-m", "--number_of_paintings", type=int, default=1)
+
+    parser.add_argument("-s", "--search", type=str)
+    parser.add_argument("-n", "--number", type=int)
+
+    parser.add_argument("--s_mode", type=str, default='partial')
+    parser.add_argument("--mode", type=str, default='all')
+    parser.add_argument("-d", "--direct_download", action="store_true")
+    parser.add_argument("-ori", "--original", action='store_true')
+
+    return parser.parse_args()
+
+
 def main(args_):
     pixiv = Pixiv('chrome')
 
@@ -403,7 +480,6 @@ def main(args_):
         pass
 
     artworks, multi_artworks = pixiv.search(args_.search, args_.number, parameters=parameters)
-    print(multi_artworks)
 
     if not args_.direct_download:
         while True:
@@ -422,26 +498,7 @@ def main(args_):
 
 
 if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("-o", "--out", type=str, default=None)
-
-    parser.add_argument("-id", "--illusid", type=int, default=None)
-    parser.add_argument("--name", type=str, default='artwork')
-    parser.add_argument("-m", "--number_of_paintings", type=int, default=1)
-
-    parser.add_argument("-s", "--search", type=str)
-    parser.add_argument("-n", "--number", type=int)
-
-    parser.add_argument("--s_mode", type=str, default='partial')
-    parser.add_argument("--mode", type=str, default='all')
-    parser.add_argument("-d", "--direct_download", action="store_true")
-    parser.add_argument("-ori", "--original", action='store_false')
-
-    args = parser.parse_args()
-
+    args = get_args()
     main(args)
 
     # p = Pixiv()
@@ -505,3 +562,55 @@ if __name__ == '__main__':
     # p = Pixiv()
     # url = p.get_url_by_illusid('84566199', 2, original=False)
     # print(url)
+
+    # test of ThreadPoolExecutor
+    # import time
+    # from random import randrange
+    # from concurrent.futures import as_completed
+    #
+    # def do(i, b):
+    #     if get_termination():
+    #         return
+    #     time.sleep(randrange(1, 5)/10)
+    #     # time.sleep(0.5)
+    #     # print_(STD_INFO + str(i))
+    #     b.update()
+    #     return i
+    #
+    # global termination
+    # lock = Lock()
+    #
+    # def set_termination(bo):
+    #     global termination
+    #     lock.acquire()
+    #     termination = bo
+    #     lock.release()
+    #     return bo
+    #
+    #
+    # def get_termination():
+    #     global termination
+    #     bo = True
+    #     lock.acquire()
+    #     bo = termination
+    #     lock.release()
+    #     return bo
+    #
+    #
+    # artworks = [i for i in range(100)]
+    # threads = []
+    # # bar = tqdm(colour='green', position=0, leave=True)
+    # bar = ProgressBar()
+    # bar.reset(len(artworks))
+    # with ThreadPoolExecutor(max_workers=3) as executor:
+    #     set_termination(False)
+    #     for illusid in artworks:
+    #         threads.append(executor.submit(do, illusid, bar))
+    #     print('\nafter assignment')
+    #     bar.display()
+    #     # input("terminate?")
+    #     # set_termination(True)
+    #     # for task in as_completed(threads):
+    #     #     print_(task.result())
+    #     #     pass
+    # print('out_of_main')
