@@ -92,7 +92,7 @@ python src/pixiv.py -id 82733226 --name artwork -o art -m 26
 
 ## Demo
 
-![Capture](Capture.png)
+![Capture](images/Capture.PNG)
 
 ## Note
 
