@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 /レッド(アークナイツ) 1000users/
 /driver/chromedriver.exe
+/exceptions_log.txt

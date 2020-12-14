@@ -504,7 +504,7 @@ if __name__ == '__main__':
 
         if len(exceptions) is not 0:
             # print_(STD_ERROR + 'following exceptions occurred when downloading ')
-            with open('exceptions_log.txt', 'w') as f:
+            with open('exceptions_log.txt', 'w', encoding='utf-8') as f:
                 for e in exceptions:
                     print_exceptions_to_file(e, f)
 
