@@ -80,7 +80,7 @@ def download_by_author(pixiv: Pixiv, args_):
     if args_.author_id is None:
         return
     assert args_.number is not None
-    if args_.manga:
+    if args_.download_manga:
         artworks, multi_works = pixiv.search_by_author(args_.author_id, args_.number, artwork_type='manga')
     else:
         artworks, multi_works = pixiv.search_by_author(args_.author_id, args_.number)
