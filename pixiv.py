@@ -88,6 +88,15 @@ def download_by_author(pixiv: Pixiv, args_):
         path = './author_{}'.format(args_.author_id)
     else:
         path = args_.out
+
+    if not args_.direct_download:
+        while True:
+            ans = input('Sure to download? [y/n]\n')
+            if ans in ['y', 'n']:
+                break
+        if ans == 'n':
+            return
+
     exceptions = pixiv.download(artworks, multi_works, path, original=args_.original)
     if len(exceptions) is not 0:
         # print_(STD_ERROR + 'following exceptions occurred when downloading ')

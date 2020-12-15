@@ -60,7 +60,7 @@ python pixiv.py [-id ILLUSID] [-o OUT] [-p] [-ori]
 **Download via author's id**
 
 ```bash
-python pixiv.py [-aut AUTHOR_ID] [-n NUMBER] [-o OUT] [-ori] [-manga]
+python pixiv.py [-aut AUTHOR_ID] [-n NUMBER] [-o OUT] [-d] [-ori] [-manga]
 ```
 
 *necessary*
@@ -71,6 +71,7 @@ python pixiv.py [-aut AUTHOR_ID] [-n NUMBER] [-o OUT] [-ori] [-manga]
 *optional*
 
 - -o: the folder to save artworks; default by root folder of project.
+- -d: flag, set to directly download searched results without asking for confirmation.
 - -ori: flag, set to download original picture(.png); default by downloading compressed picture(.jpg).
 - -manga: flag, set to download the author's manga instead of illustrations.
 
