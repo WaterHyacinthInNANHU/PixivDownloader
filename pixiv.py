@@ -17,6 +17,7 @@ def get_args():
     parser.add_argument("-d", "--direct_download", action="store_true")
     parser.add_argument("-ori", "--original", action='store_true')
     parser.add_argument("-aut", "--author_id", type=str)
+    parser.add_argument("-manga", "--download_manga", default='store_true')
 
     return parser.parse_args()
 
@@ -79,7 +80,10 @@ def download_by_author(pixiv: Pixiv, args_):
     if args_.author_id is None:
         return
     assert args_.number is not None
-    artworks, multi_works = pixiv.search_by_author(args_.author_id, args_.number)
+    if args_.manga:
+        artworks, multi_works = pixiv.search_by_author(args_.author_id, args_.number, artwork_type='manga')
+    else:
+        artworks, multi_works = pixiv.search_by_author(args_.author_id, args_.number)
     if args_.out is None:
         path = './author_{}'.format(args_.author_id)
     else:
@@ -101,4 +105,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    p = Pixiv()
+    artworks, multi_works = p.search_by_author('5806400', 0, 'manga')
+    print(artworks)
+    print(multi_works)
