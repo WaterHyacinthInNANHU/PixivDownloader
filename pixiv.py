@@ -105,8 +105,5 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
-    p = Pixiv()
-    artworks, multi_works = p.search_by_author('5806400', 0, 'manga')
-    print(artworks)
-    print(multi_works)
+    main()
+
