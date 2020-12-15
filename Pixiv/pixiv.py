@@ -307,7 +307,10 @@ class Pixiv(object):
             number = re.findall(r'<span>(.*?)</span></div>', block)
             if len(number) is 0:
                 continue
-            multi_artworks[illusid[0]] = number[0]
+            number = number[0]
+            if not number.isnumeric():
+                continue
+            multi_artworks[illusid[0]] = int(number)
         return multi_artworks
 
     @staticmethod

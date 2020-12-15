@@ -31,7 +31,7 @@ python pixiv.py [-s SEARCH] [-n NUMBER] [-o OUT] [-sm SEARCH_MODE] [--m MODE] [-
 *necessary*
 
 - -s: what you want to search for.
-- -n: number of results you want to get.
+- -n: number of results you want to get, ```0``` for all artworks.
 
 *optional*
 
@@ -57,7 +57,25 @@ python pixiv.py [-id ILLUSID] [-o OUT] [-p] [-ori]
 - -p; the number of painting contained by the target artwork with identical id; default by 1.
 - -ori: flag, set to download original picture(.png); default by downloading compressed picture(.jpg).
 
+**Download via author's id**
+
+```bash
+python pixiv.py [-aut AUTHOR_ID] [-n NUMBER] [-o OUT] [-ori]
+```
+
+*necessary*
+
+- -id: id of the author.
+- -n: number of results you want to get, ```0``` for all artworks.
+
+*optional*
+
+- -o: the folder to save artworks; default by root folder of project.
+- -ori: flag, set to download original picture(.png); default by downloading compressed picture(.jpg).
+
 ## Examples
+
+**Search and download**
 
 Search for 100 artworks related to "stein gate 1000users入り" in png format.
 
@@ -77,6 +95,8 @@ Search for 100 artworks perfectly matched with "stein gate 1000users入り"  for
 python pixiv.py -s "stein gate 1000users入り" -n 100 -o "./artworks" --sm perfect -m safe
 ```
 
+**Download via id**
+
 Download the artworks with id: 78396392 under ```./art```
 
 ```bash
@@ -87,6 +107,14 @@ Download the artworks with id: 82733226 under ```./art``` which contains 26 pain
 
 ```bash
 python pixiv.py -id 82733226 -o art -p 26
+```
+
+**Download via author's id**
+
+Download all artworks of the author with id 5806400.
+
+```bash
+python pixiv.py -aut 5806400 -n 0
 ```
 
 ## Demo

@@ -51,6 +51,11 @@ def search_and_download(pixiv: Pixiv, args_):
     else:
         pass
 
+    if args_.out is None:
+        out_dir = './' + args_.search
+    else:
+        out_dir = args_.out
+
     artworks, multi_artworks = pixiv.search(args_.search, args_.number, parameters=parameters)
 
     if not args_.direct_download:
@@ -60,11 +65,6 @@ def search_and_download(pixiv: Pixiv, args_):
                 break
         if ans == 'n':
             return
-
-    if args_.out is None:
-        out_dir = './' + args_.search
-    else:
-        out_dir = args_.out
 
     exceptions = pixiv.download(artworks, multi_artworks, out_dir, original=args_.original)
 
@@ -80,7 +80,10 @@ def download_by_author(pixiv: Pixiv, args_):
         return
     assert args_.number is not None
     artworks, multi_works = pixiv.search_by_author(args_.author_id, args_.number)
-    path = './author_{}'.format(args_.author_id)
+    if args_.out is None:
+        path = './author_{}'.format(args_.author_id)
+    else:
+        path = args_.out
     exceptions = pixiv.download(artworks, multi_works, path, original=args_.original)
     if len(exceptions) is not 0:
         # print_(STD_ERROR + 'following exceptions occurred when downloading ')
