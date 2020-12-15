@@ -118,6 +118,12 @@ Download all artworks of the author with id 5806400.
 python pixiv.py -aut 5806400 -n 0
 ```
 
+Download all manga of the author with id 5806400.
+
+```bash
+python pixiv.py -aut 5806400 -n 0 -manga
+```
+
 ## Demo
 
 ![Capture](images/Capture.PNG)
