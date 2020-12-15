@@ -3,10 +3,10 @@ import requests
 from requests.adapters import HTTPAdapter
 import re
 import signal
-from utils.check_image import check_png_stream, check_jpg_jpeg_stream
-from utils.path import *
-from utils.logging import *
-from exception import *
+from .utils.check_image import check_png_stream, check_jpg_jpeg_stream
+from .utils.path import *
+from .utils.logging import *
+from .exception import *
 import browser_cookie3
 from selenium import webdriver
 from urllib import parse
@@ -343,8 +343,8 @@ class Pixiv(object):
         except AttributeError or ValueError:  # no artwork
             return None
 
-    def search(self, search_term: str, number, artwork_type: str = 'artworks', parameters: dict = None,
-               max_retries: int = 3):
+    def search(self, search_term: str, number: int, artwork_type: str = 'artworks', parameters: dict = None,
+               max_retries: int = 5):
         """
         search for related artworks
         :param search_term: searched terms
@@ -356,10 +356,10 @@ class Pixiv(object):
         """
         self.print_(STD_INFO + 'start searching...')
 
-        if number == 'ALL':  # download all
+        if number == 0:  # download all
+            self.print_(STD_INFO + 'parameter: number is 0, search for all artworks')
             number = float('inf')
-        else:
-            assert type(number) == int and number != 0
+
         if parameters is None:
             parameters = {'s_mode': 's_tag'}
 
@@ -375,8 +375,8 @@ class Pixiv(object):
             page_number += 1
 
             # fetch page
-            url = 'https://www.pixiv.net/tags/' + parse.quote(search_term) + '/' + artwork_type + '?' + para + '&' + \
-                  'p=' + str(page_number)
+            url = 'https://www.pixiv.net/tags/{}/{}?{}&p={}'.format(parse.quote(search_term), artwork_type, para,
+                                                                    page_number)
             self.print_(STD_INFO + 'fetching ' + url)
             while True:
                 page = self.get_page(url, use_selenium=True)['html']
@@ -385,7 +385,7 @@ class Pixiv(object):
 
                 # check for termination or retry
                 if new_artworks == {}:
-                    self.print_(STD_WARNING + 'insufficient new artworks, retry')
+                    self.print_(STD_INFO + 'insufficient new artworks, retry')
                 else:
                     break
                 retries -= 1
@@ -399,7 +399,7 @@ class Pixiv(object):
                     return artworks, multi_artworks
 
             # get max number of artworks
-            max_number = self.get_total_number_from_page(page)
+            # max_number = self.get_total_number_from_page(page)
 
             # check artworks's length, if surpassed the specific length, randomly pop items from new_artworks
             length = len(artworks)
@@ -409,9 +409,9 @@ class Pixiv(object):
                     new_artworks.pop(choice(list(new_artworks.keys())))
 
             # merge artworks and new_artworks, so is multi_artworks
-            if first_time_flag:
-                if max_number is not None:
-                    self.print_(STD_INFO + str(max_number) + ' artworks were found in total.')
+            # if first_time_flag:
+            #     if max_number is not None:
+            #         self.print_(STD_INFO + str(max_number) + ' artworks were found in total.')
             self.print_(STD_INFO + str(len(new_artworks)) + ' new artworks have been collected. ')
             artworks = self.merge_two_dicts(new_artworks, artworks)
             multi_artworks = self.merge_two_dicts(new_multi_artworks, multi_artworks)
@@ -421,9 +421,90 @@ class Pixiv(object):
             length = len(artworks)
             if length >= number:
                 break
-            if max_number is not None:
-                if length >= max_number:
+            # if max_number is not None:
+            #     if length >= max_number:
+            #         break
+
+            if first_time_flag:
+                first_time_flag = False
+
+        self.print_(STD_INFO + str(len(artworks)) + ' artworks have been collected, search completed.')
+        return artworks, multi_artworks
+
+    def search_by_author(self, author_id: str, number: int, artwork_type: str = 'illustrations', max_retries: int = 5):
+        """
+        search for related artworks
+        :param author_id: author id
+        :param number: number of artworks to find
+        :param artwork_type: artwork's type
+        :param max_retries: max times to retry while loading a page
+        :return: a dictionary of artworks and a dictionary of artworks containing multiple paintings
+        """
+        self.print_(STD_INFO + 'start searching...')
+
+        if number == 0:  # download all
+            self.print_(STD_INFO + 'parameter: number is 0, search for all artworks')
+            number = float('inf')
+
+        assert artwork_type == 'illustrations' or 'manga'
+
+        artworks = {}
+        multi_artworks = {}  # a look-up dictionary, mark the artworks that have multiple paintings
+        page_number = 0
+        first_time_flag = True
+        while True:
+            retries = max_retries
+            page_number += 1
+
+            # fetch page
+            url = 'https://www.pixiv.net/en/users/{}/{}?p={}'.format(author_id, artwork_type, page_number)
+            self.print_(STD_INFO + 'fetching ' + url)
+            while True:
+                page = self.get_page(url, use_selenium=True)['html']
+                new_artworks = self.get_artworks_from_page(page)
+                new_multi_artworks = self.get_multi_artworks_from_page(page)
+
+                # check for termination or retry
+                if new_artworks == {}:
+                    self.print_(STD_INFO + 'insufficient new artworks, retry')
+                else:
                     break
+                retries -= 1
+                if retries == 0:
+                    if first_time_flag:
+                        self.print_(STD_ERROR + 'no related artworks were found, please retry or check terms you '
+                                                'searched')
+                        return artworks, multi_artworks
+                    self.print_(STD_WARNING + 'insufficient new artworks, ' + str(
+                        len(artworks)) + ' artworks have been collected.')
+                    return artworks, multi_artworks
+
+            # get max number of artworks
+            # max_number = self.get_total_number_from_page(page)
+
+            # check artworks's length, if surpassed the specific length, randomly pop items from new_artworks
+            length = len(artworks)
+            new_length = len(new_artworks)
+            if length + new_length > number:
+                for _ in range(length + new_length - number):
+                    new_artworks.pop(choice(list(new_artworks.keys())))
+
+            # merge artworks and new_artworks, so is multi_artworks
+            # if first_time_flag:
+            #     if max_number is not None:
+            #         self.print_(STD_INFO + str(max_number) + ' artworks were found in total.')
+            self.print_(STD_INFO + str(len(new_artworks)) + ' new artworks have been collected. ')
+            artworks = self.merge_two_dicts(new_artworks, artworks)
+            multi_artworks = self.merge_two_dicts(new_multi_artworks, multi_artworks)
+            self.print_(STD_INFO + str(len(artworks)) + ' artworks have been collected for now.')
+
+            # check for termination
+            length = len(artworks)
+            if length >= number:
+                break
+            # if max_number is not None:
+            #     if length >= max_number:
+            #         break
 
             if first_time_flag:
                 first_time_flag = False
@@ -433,83 +514,14 @@ class Pixiv(object):
 
 
 if __name__ == '__main__':
+    pass
+    # args = get_args()
+    # main(args)
 
-    def get_args():
-        import argparse
-
-        parser = argparse.ArgumentParser()
-
-        parser.add_argument("-o", "--out", type=str, default=None)
-
-        parser.add_argument("-id", "--illusid", type=int, default=None)
-        parser.add_argument("--name", type=str, default='artwork')
-        parser.add_argument("-m", "--number_of_paintings", type=int, default=1)
-
-        parser.add_argument("-s", "--search", type=str)
-        parser.add_argument("-n", "--number", type=int)
-
-        parser.add_argument("--s_mode", type=str, default='partial')
-        parser.add_argument("--mode", type=str, default='all')
-        parser.add_argument("-d", "--direct_download", action="store_true")
-        parser.add_argument("-ori", "--original", action='store_true')
-
-        return parser.parse_args()
-
-
-    def main(args_):
-        pixiv = Pixiv('chrome')
-
-        # download by id
-        if args_.illusid is not None:
-            if args_.out is None:
-                out_dir = './'
-            else:
-                out_dir = args_.out
-            pixiv.download({args_.illusid: args_.name}, {args_.illusid: args_.number_of_paintings}, out_dir,
-                           original=args_.original)
-            return
-
-        # search and download
-        parameters = {}
-        if args_.s_mode == 'title':
-            parameters['s_mode'] = 's_tc'
-        elif args_.s_mode == 'perfect':
-            pass
-        else:
-            parameters['s_mode'] = 's_tag'
-
-        if args_.mode == 'safe':
-            parameters['mode'] = 'safe'
-        elif args_.mode == 'r18':
-            parameters['mode'] = 'r18'
-        else:
-            pass
-
-        artworks, multi_artworks = pixiv.search(args_.search, args_.number, parameters=parameters)
-
-        if not args_.direct_download:
-            while True:
-                ans = input('Sure to download? [y/n]\n')
-                if ans in ['y', 'n']:
-                    break
-            if ans == 'n':
-                return
-
-        if args_.out is None:
-            out_dir = './' + args_.search
-        else:
-            out_dir = args_.out
-
-        exceptions = pixiv.download(artworks, multi_artworks, out_dir)
-
-        if len(exceptions) is not 0:
-            # print_(STD_ERROR + 'following exceptions occurred when downloading ')
-            with open('exceptions_log.txt', 'w', encoding='utf-8') as f:
-                for e in exceptions:
-                    print_exceptions_to_file(e, f)
-
-    args = get_args()
-    main(args)
+    # p = Pixiv()
+    # artworks, multi = p.search_by_author('5806400', 0)
+    # print(artworks)
+    # print(multi)
 
     # p = Pixiv()
     # url = p.get_url_by_illusid(86138069)
