@@ -12,21 +12,18 @@ from selenium import webdriver
 from urllib import parse
 from random import choice
 from concurrent.futures import ThreadPoolExecutor
-# from tqdm import tqdm
 from concurrent.futures import as_completed
-# import traceback
 from time import sleep
-
-# parameters
-NUMBER_OF_WORKERS = 20
-SIZE_OF_CONNECTIONS_POOL = NUMBER_OF_WORKERS
-REQUEST_INTERVAL = 0.050
 
 
 class Pixiv(object):
     domain = '.pixiv.net'
     home_page = "http://www.pixiv.net"
     ranking_page = 'https://www.pixiv.net/ranking.php'
+    MAX_WORKERS = 20
+    SIZE_OF_CONNECTIONS_POOL = MAX_WORKERS
+    REQUEST_INTERVAL = 0.050
+    SYSTEM_CHARACTERS = r'\/:*?"<>'
 
     def __init__(self, browser='chrome', print__=print_):
         """
@@ -44,7 +41,7 @@ class Pixiv(object):
         self.session = requests.Session()
         # about pool_connections and pool_maxsize,
         # refer to: https://laike9m.com/blog/requests-secret-pool_connections-and-pool_maxsize,89/
-        adapter = HTTPAdapter(pool_connections=10, pool_maxsize=SIZE_OF_CONNECTIONS_POOL)
+        adapter = HTTPAdapter(pool_connections=10, pool_maxsize=Pixiv.SIZE_OF_CONNECTIONS_POOL)
         self.session.mount('https://', adapter)
         self.session.mount('http://', adapter)
         self.session.cookies = self.cookies
@@ -121,12 +118,18 @@ class Pixiv(object):
         z.update(y)
         return z
 
+    @staticmethod
+    def replace_system_character(string: str, char: str = '&'):
+        rx = '[' + re.escape(Pixiv.SYSTEM_CHARACTERS) + ']'
+        res = re.sub(rx, char, string)
+        return res
+
     def _session_get(self, url, retries=5, **kwargs):
         last_connection_exception = None
         while retries:
             try:
                 self._session_get_lock.acquire()
-                sleep(REQUEST_INTERVAL)
+                sleep(Pixiv.REQUEST_INTERVAL)
                 self._session_get_lock.release()
                 return self.session.get(url, **kwargs)
             except requests.exceptions.ConnectionError as e:
@@ -216,21 +219,20 @@ class Pixiv(object):
                 p = '_p{}'.format(index)
             else:
                 p = ''
+            name = self.replace_system_character(name, char='%')
             file_path = '{}/{}_id_{}{}{}'.format(path, str(name), str(illusid), p, image_type)
             with open(file_path, 'wb') as f:
                 f.write(bytestream)
 
         self.p_bar.update()
 
-    def download(self, artworks: dict, multi_artworks: dict, path: str, original: bool = True,
-                 max_workers: int = NUMBER_OF_WORKERS):
+    def download(self, artworks: dict, multi_artworks: dict, path: str, original: bool = True):
         """
         run download threads
         :param artworks: artworks
         :param multi_artworks: a dictionary containing illusid with multiple artworks
         :param path: path to save
         :param original: flag, set to download original pictures
-        :param max_workers: max workers of threading pool
         :return: a list of exceptions returned by threads
         """
         if len(artworks) is 0:
@@ -244,7 +246,7 @@ class Pixiv(object):
 
         mkdir_(path)
         threads = []
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=Pixiv.MAX_WORKERS) as executor:
             for illusid in artworks:
                 # check multiple-painting artworks
                 if illusid in multi_artworks:

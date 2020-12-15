@@ -80,7 +80,7 @@ def download_by_author(pixiv: Pixiv, args_):
         return
     assert args_.number is not None
     artworks, multi_works = pixiv.search_by_author(args_.author_id, args_.number)
-    path = './author{}'.format(args_.author_id)
+    path = './author_{}'.format(args_.author_id)
     exceptions = pixiv.download(artworks, multi_works, path, original=args_.original)
     if len(exceptions) is not 0:
         # print_(STD_ERROR + 'following exceptions occurred when downloading ')
