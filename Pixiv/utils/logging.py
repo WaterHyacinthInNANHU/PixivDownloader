@@ -73,7 +73,7 @@ class ProgressBar(object):
             print_("\r{}progress:| {}{}{} | {} / {} |".format(percent, '#'*integer, decimal, '-'*(99-integer), n,
                                                               total), end='')
         else:
-            print_("\r{}progress:| {} | {} / {} |\n".format(percent, '#' * 100, n, total))
+            print_("\r{}progress:| {} | {} / {} |".format(percent, '#' * 100, n, total))
 
     def reset(self, total: int = None):
         self.lock.acquire()
