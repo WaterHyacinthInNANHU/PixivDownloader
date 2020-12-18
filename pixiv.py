@@ -17,7 +17,7 @@ def get_args():
     parser.add_argument("-d", "--direct_download", action="store_true")
     parser.add_argument("-ori", "--original", action='store_true')
     parser.add_argument("-aut", "--author_id", type=str)
-    parser.add_argument("-manga", "--download_manga", default='store_true')
+    parser.add_argument("-manga", "--download_manga", action='store_true')
 
     return parser.parse_args()
 
@@ -114,5 +114,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-
+    # main()
+    args = get_args()
+    print(args)
