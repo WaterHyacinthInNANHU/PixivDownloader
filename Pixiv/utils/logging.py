@@ -11,12 +11,12 @@ STD_ERROR = colored('[ERROR] ', 'red')
 STD_WARNING = colored('[WARNING] ', 'yellow')
 STD_INPUT = colored('[INPUT] ', 'blue')
 
-try:
-    import coloredlogs
-
-    coloredlogs.install()
-except BaseException:
-    pass
+# try:
+#     import coloredlogs
+#
+#     coloredlogs.install()
+# except BaseException:
+#     pass
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -71,7 +71,7 @@ class ProgressBar(object):
         decimal = points % 10
         if points != 1000:
             print_("\r{}progress:| {}{}{} | {} / {} |".format(percent, '#'*integer, decimal, '-'*(99-integer), n,
-                                                              total), end='')
+                                                              total), end='', flush=True)
         else:
             print_("\r{}progress:| {} | {} / {} |".format(percent, '#' * 100, n, total))
 
