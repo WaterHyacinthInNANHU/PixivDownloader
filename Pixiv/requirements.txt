@@ -4,3 +4,4 @@ browser_cookie3
 colorama
 beautifulsoup4
 lxml
+termcolor
