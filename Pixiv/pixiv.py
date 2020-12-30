@@ -14,6 +14,7 @@ from random import choice
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 from time import sleep
+import json
 
 
 class Pixiv(object):
@@ -73,11 +74,6 @@ class Pixiv(object):
         self.__del__()
         exit(0)
 
-    @staticmethod
-    def set_environment_variable():
-        path = join_(parent_path_(root_path_()), 'driver')
-        set_path_(path)
-
     def check_terminate_signal(self):
         signal.signal(
             signal.SIGINT, self.stop_signal_handler()
@@ -86,6 +82,11 @@ class Pixiv(object):
             signal.SIGTERM,
             self.stop_signal_handler()
         )
+
+    @staticmethod
+    def set_environment_variable():
+        path = join_(parent_path_(root_path_()), 'driver')
+        set_path_(path)
 
     @staticmethod
     def load_cookies_from_txt(cookie_path: str):
@@ -119,154 +120,43 @@ class Pixiv(object):
         return z
 
     @staticmethod
+    def sort_dict_by_key(a: list, key):
+        a.sort(key=lambda x: x[key])
+        return a
+
+    @staticmethod
+    def merge_info_metas(names, *args: dict, essential=None):
+        """
+        merge info metas(dictionaries like: {'illust_id': info}) into a list likes: [{meta1}, {meta2}, ...]
+        information with same id will be merged into same meta
+        :param names: names of the metas
+        :param args: meta dictionaries, must have the same length with [names]
+        :param essential: the name of meta that result list must contents
+        i.e. will remove the items without essential meta
+        :return: a list of merged metas
+        """
+        res = []
+        id_set = set()
+        for arg in args:
+            for item in arg:
+                id_set.add(item)
+        for _id in id_set:
+            info = {'illust_id': _id}
+            for arg, meta_name in zip(args, names):
+                if _id in arg:
+                    info[meta_name] = arg[_id]
+            res.append(info)
+        if essential is not None:
+            res = [item for item in res if essential in item]
+        return res
+
+    @staticmethod
     def replace_system_character(string: str, char: str = '&'):
         rx = '[' + re.escape(Pixiv.SYSTEM_CHARACTERS) + ']'
         res = re.sub(rx, char, string)
+        spaces = [1 for c in res if c == ' ']
+        res = res[len(spaces):]
         return res
-
-    def _session_get(self, url, retries=5, **kwargs):
-        last_connection_exception = None
-        while retries:
-            try:
-                self._session_get_lock.acquire()
-                sleep(Pixiv.REQUEST_INTERVAL)
-                self._session_get_lock.release()
-                return self.session.get(url, **kwargs)
-            except requests.exceptions.ConnectionError as e:
-                last_connection_exception = e
-                retries -= 1
-        raise last_connection_exception
-
-    def get_page(self, url: str, cookies=None, use_selenium: bool = False):
-        """
-        get page from url
-        :param url: url
-        :param cookies: cookies
-        :param use_selenium: flag, set to use selenium to load page
-        :return: a dictionary containing text of html and status code   (and response object returned by session.get)
-        """
-        if cookies is None:
-            cookies = self.cookies
-        if use_selenium:
-            try:
-                # reload cookies
-                self.web_driver.delete_all_cookies()
-                # https://stackoverflow.com/questions/41559510/selenium-chromedriver-add-cookie-invalid-domain-error/44857193
-                self.web_driver.get(
-                    Pixiv.home_page)
-                for cookie in cookies:
-                    self.web_driver.add_cookie({"name": cookie.name, "value": cookie.value, "domain": cookie.domain})
-
-                self.web_driver.get(url)
-            except Exception:
-                raise PageIsNotAvailableError
-            return {'html': self.web_driver.page_source, 'code': 200}
-        else:
-            r = self._session_get(url)
-            if r.status_code is not 200:
-                raise PageIsNotAvailableError
-            return {'html': r.text, 'response': r, 'code': r.status_code}
-
-    def get_url_by_illusid(self, illusid: str, number_of_paintings: int, original: bool = True):
-        """
-        get urls via illusid
-        :param illusid: illusid
-        :param number_of_paintings: number of paintings in identical illus
-        :param original: flag to download original file(.png)
-        :return: a list of urls of paintings
-        """
-        html = self.get_page('https://www.pixiv.net/ajax/illust/' + str(illusid))['html']
-        urls = []
-        for number in range(number_of_paintings):
-            if original:
-                url = re.match(r'.*\"original\":\"(.*?)\".*', html).group(1)
-            else:
-                url = re.match(r'.*\"regular\":\"(.*?)\".*', html).group(1)
-            url = re.sub(r'p\d', 'p{}'.format(number), url)
-            url = url.replace('\\', '')
-            urls += [url]
-        return urls
-
-    def _download(self, illusid: str, name: str, number_of_paintings: int, path: str, original: bool):
-        """
-        threading download callback function
-        :param illusid: illusid
-        :param name: name of the artwork
-        :param number_of_paintings: number of paintings in identical artwork
-        :param path: path to save
-        :param original: flag, set to download original picture
-        :return: None
-        """
-        urls = self.get_url_by_illusid(illusid, number_of_paintings, original)
-        if len(urls) > 1:
-            path = '{}/{}_id_{}'.format(path, str(name), str(illusid))
-            mkdir_(path)
-        for index, url in enumerate(urls):
-            try:
-                response = self.get_page(url)['response']
-            except PageFailedToRespond:
-                self.print_('\n' + STD_ERROR + 'error occurred downloading ' + name + ' ' + url)
-                continue
-            bytestream = response.content
-            if check_jpg_jpeg_stream(bytestream):
-                image_type = '.jpg'
-            elif check_png_stream(bytestream):
-                image_type = '.png'
-            else:
-                self.print_('\n' + STD_WARNING + 'unsupported format or broken file, drop: ' + name + ' ' + url)
-                continue
-            if index is not 0:
-                p = '_p{}'.format(index)
-            else:
-                p = ''
-            name = self.replace_system_character(name, char='%')
-            file_path = '{}/{}_id_{}{}{}'.format(path, str(name), str(illusid), p, image_type)
-            with open(file_path, 'wb') as f:
-                f.write(bytestream)
-
-        self.p_bar.update()
-
-    def download(self, artworks: dict, multi_artworks: dict, path: str, original: bool = True):
-        """
-        run download threads
-        :param artworks: artworks
-        :param multi_artworks: a dictionary containing illusid with multiple artworks
-        :param path: path to save
-        :param original: flag, set to download original pictures
-        :return: a list of exceptions returned by threads
-        """
-        if len(artworks) is 0:
-            self.print_(STD_WARNING + 'no artwork to be downloaded, return')
-            return
-
-        self.print_(STD_INFO + 'start downloading ' + str(len(artworks)) + ' items...')
-
-        self.p_bar.reset(len(artworks))
-        self.p_bar.display()
-
-        mkdir_(path)
-        threads = []
-        with ThreadPoolExecutor(max_workers=Pixiv.MAX_WORKERS) as executor:
-            for illusid in artworks:
-                # check multiple-painting artworks
-                if illusid in multi_artworks:
-                    number_of_paintings = int(multi_artworks[illusid])
-                else:
-                    number_of_paintings = 1
-                threads.append(
-                    executor.submit(self._download, illusid, artworks[illusid], number_of_paintings, path, original))
-
-            # handle exceptions
-            exceptions = []
-            for task in as_completed(threads):
-                try:
-                    _ = task.result()
-                except Exception as _:
-                    # traceback.print_exc(limit=1)
-                    exceptions.append(_)
-                    self.p_bar.update()
-        self.print_(STD_INFO + 'download finished ')
-        return exceptions
 
     @staticmethod
     def get_artworks_from_page(html: str):
@@ -348,6 +238,149 @@ class Pixiv(object):
         except AttributeError or ValueError:  # no artwork
             return None
 
+    def _session_get(self, url, retries=5, **kwargs):
+        last_connection_exception = None
+        while retries:
+            try:
+                self._session_get_lock.acquire()
+                sleep(Pixiv.REQUEST_INTERVAL)
+                self._session_get_lock.release()
+                return self.session.get(url, **kwargs)
+            except requests.exceptions.ConnectionError as e:
+                last_connection_exception = e
+                retries -= 1
+        raise last_connection_exception
+
+    def get_page(self, url: str, cookies=None, use_selenium: bool = False):
+        """
+        get page from url
+        :param url: url
+        :param cookies: cookies
+        :param use_selenium: flag, set to use selenium to load page
+        :return: a dictionary containing text of html and status code   (and response object returned by session.get)
+        """
+        if cookies is None:
+            cookies = self.cookies
+        if use_selenium:
+            try:
+                # reload cookies
+                self.web_driver.delete_all_cookies()
+                # https://stackoverflow.com/questions/41559510/selenium-chromedriver-add-cookie-invalid-domain-error/44857193
+                self.web_driver.get(
+                    Pixiv.home_page)
+                for cookie in cookies:
+                    self.web_driver.add_cookie({"name": cookie.name, "value": cookie.value, "domain": cookie.domain})
+                self.web_driver.get(url)
+            except Exception:
+                raise PageIsNotAvailableError
+            return {'html': self.web_driver.page_source, 'code': 200}
+        else:
+            r = self._session_get(url)
+            if r.status_code is not 200:
+                raise PageIsNotAvailableError
+            return {'html': r.text, 'response': r, 'code': r.status_code}
+
+    def get_url_by_illusid(self, illusid: str, number_of_paintings: int, original: bool = True):
+        """
+        get urls via illusid
+        :param illusid: illusid
+        :param number_of_paintings: number of paintings in identical illus
+        :param original: flag to download original file(.png)
+        :return: a list of urls of paintings
+        """
+        html = self.get_page('https://www.pixiv.net/ajax/illust/' + str(illusid))['html']
+        urls = []
+        for number in range(number_of_paintings):
+            if original:
+                url = re.match(r'.*\"original\":\"(.*?)\".*', html).group(1)
+            else:
+                url = re.match(r'.*\"regular\":\"(.*?)\".*', html).group(1)
+            url = re.sub(r'p\d', 'p{}'.format(number), url)
+            url = url.replace('\\', '')
+            urls += [url]
+        return urls
+
+    def _download(self, illusid: str, name: str, number_of_paintings: int, path: str, original: bool):
+        """
+        threading download callback function
+        :param illusid: illusid
+        :param name: name of the artwork
+        :param number_of_paintings: number of paintings in identical artwork
+        :param path: path to save
+        :param original: flag, set to download original picture
+        :return: None
+        """
+        urls = self.get_url_by_illusid(illusid, number_of_paintings, original)
+        if len(urls) > 1:
+            path = '{}/{}_id_{}'.format(path, str(name), str(illusid))
+            mkdir_(path)
+        for index, url in enumerate(urls):
+            try:
+                response = self.get_page(url)['response']
+            except PageFailedToRespond:
+                self.print_('\n' + STD_ERROR + 'error occurred downloading ' + name + ' ' + url)
+                continue
+            bytestream = response.content
+            if check_jpg_jpeg_stream(bytestream):
+                image_type = '.jpg'
+            elif check_png_stream(bytestream):
+                image_type = '.png'
+            else:
+                self.print_('\n' + STD_WARNING + 'unsupported format or broken file, drop: ' + name + ' ' + url)
+                continue
+            if index is not 0:
+                p = '_p{}'.format(index)
+            else:
+                p = ''
+            name = self.replace_system_character(name, char='%')
+            file_path = '{}/{}_id_{}{}{}'.format(path, str(name), str(illusid), p, image_type)
+            with open(file_path, 'wb') as f:
+                f.write(bytestream)
+
+        self.p_bar.update()
+
+    def download(self, artworks: list, path: str, original: bool = True):
+        """
+        run download threads
+        :param artworks: a list of artworks' information
+        :param path: path to save
+        :param original: flag, set to download original pictures
+        :return: a list of exceptions returned by threads
+        """
+        if len(artworks) is 0:
+            self.print_(STD_WARNING + 'no artwork to be downloaded, return')
+            return
+
+        self.print_(STD_INFO + 'start downloading ' + str(len(artworks)) + ' items...')
+
+        self.p_bar.reset(len(artworks))
+        self.p_bar.display()
+
+        mkdir_(path)
+        threads = []
+        with ThreadPoolExecutor(max_workers=Pixiv.MAX_WORKERS) as executor:
+            for item in artworks:
+                # check multiple-painting artworks
+                number_of_paintings = 1
+                if 'illust_page_count' in item:
+                    if int(item['illust_page_count']) is not 1:
+                        number_of_paintings = int(item['illust_page_count'])
+                threads.append(
+                    executor.submit(self._download, item['illust_id'], item['title'], number_of_paintings, path,
+                                    original))
+
+            # handle exceptions
+            exceptions = []
+            for task in as_completed(threads):
+                try:
+                    _ = task.result()
+                except Exception as _:
+                    # traceback.print_exc(limit=1)
+                    exceptions.append(_)
+                    self.p_bar.update()
+        self.print_(STD_INFO + 'download finished ')
+        return exceptions
+
     def search(self, search_term: str, number: int, artwork_type: str = 'artworks', parameters: dict = None,
                max_retries: int = 5):
         """
@@ -361,7 +394,7 @@ class Pixiv(object):
         """
         self.print_(STD_INFO + 'start searching...')
 
-        if number == 0:  # download all
+        if number <= 0:  # download all
             self.print_(STD_INFO + 'parameter: number is 0, search for all artworks')
             number = float('inf')
 
@@ -398,10 +431,12 @@ class Pixiv(object):
                     if first_time_flag:
                         self.print_(STD_ERROR + 'no related artworks were found, please retry or check terms you '
                                                 'searched')
-                        return artworks, multi_artworks
+                        return self.merge_info_metas(['title', 'illust_page_count'], artworks, multi_artworks,
+                                                     essential='title')
                     self.print_(STD_WARNING + 'insufficient new artworks, ' + str(
                         len(artworks)) + ' artworks have been collected.')
-                    return artworks, multi_artworks
+                    return self.merge_info_metas(['title', 'illust_page_count'], artworks, multi_artworks,
+                                                 essential='title')
 
             # get max number of artworks
             # max_number = self.get_total_number_from_page(page)
@@ -411,7 +446,8 @@ class Pixiv(object):
             new_length = len(new_artworks)
             if length + new_length > number:
                 for _ in range(length + new_length - number):
-                    new_artworks.pop(choice(list(new_artworks.keys())))
+                    choices = choice(list(new_artworks.keys()))
+                    new_artworks.pop(choices)
 
             # merge artworks and new_artworks, so is multi_artworks
             # if first_time_flag:
@@ -434,7 +470,8 @@ class Pixiv(object):
                 first_time_flag = False
 
         self.print_(STD_INFO + str(len(artworks)) + ' artworks have been collected, search completed.')
-        return artworks, multi_artworks
+        return self.merge_info_metas(['title', 'illust_page_count'], artworks, multi_artworks,
+                                     essential='title')
 
     def search_by_author(self, author_id: str, number: int, artwork_type: str = 'illustrations', max_retries: int = 5):
         """
@@ -447,7 +484,7 @@ class Pixiv(object):
         """
         self.print_(STD_INFO + 'start searching...')
 
-        if number == 0:  # download all
+        if number <= 0:  # download all
             self.print_(STD_INFO + 'parameter: number is 0, search for all artworks')
             number = float('inf')
 
@@ -479,10 +516,12 @@ class Pixiv(object):
                     if first_time_flag:
                         self.print_(STD_ERROR + 'no related artworks were found, please retry or check terms you '
                                                 'searched')
-                        return artworks, multi_artworks
+                        return self.merge_info_metas(['title', 'illust_page_count'], artworks, multi_artworks,
+                                                     essential='title')
                     self.print_(STD_WARNING + 'insufficient new artworks, ' + str(
                         len(artworks)) + ' artworks have been collected.')
-                    return artworks, multi_artworks
+                    return self.merge_info_metas(['title', 'illust_page_count'], artworks, multi_artworks,
+                                                 essential='title')
 
             # get max number of artworks
             # max_number = self.get_total_number_from_page(page)
@@ -492,7 +531,8 @@ class Pixiv(object):
             new_length = len(new_artworks)
             if length + new_length > number:
                 for _ in range(length + new_length - number):
-                    new_artworks.pop(choice(list(new_artworks.keys())))
+                    choices = choice(list(new_artworks.keys()))
+                    new_artworks.pop(choices)
 
             # merge artworks and new_artworks, so is multi_artworks
             # if first_time_flag:
@@ -515,129 +555,41 @@ class Pixiv(object):
                 first_time_flag = False
 
         self.print_(STD_INFO + str(len(artworks)) + ' artworks have been collected, search completed.')
-        return artworks, multi_artworks
+        return self.merge_info_metas(['title', 'illust_page_count'], artworks, multi_artworks,
+                                     essential='title')
 
+    def search_by_ranking(self, number: int, mode: str = 'daily', artwork_type: str = '', R_18: bool = False):
+        if number <= 0:  # error
+            self.print_(STD_ERROR + 'parameter: number is invalid')
+            return []
 
-if __name__ == '__main__':
-    pass
-    # args = get_args()
-    # main(args)
-
-    # p = Pixiv()
-    # artworks, multi = p.search_by_author('5806400', 0)
-    # print(artworks)
-    # print(multi)
-
-    # p = Pixiv()
-    # url = p.get_url_by_illusid(86138069)
-    # p.download(86138069, 'hhh', '.')
-    # print(url)
-
-    # p = Pixiv()
-    # url = 'https://www.pixiv.net/tags/lappland/artworks?s_mode=s_tag'
-    # r = requests.get(url, cookies=p.cookies, headers=p.headers)
-    # with open('page.html', 'w', encoding='utf-8') as f:
-    #     f.write(r.text)
-
-    # p = Pixiv()
-    # url = p.get_url_by_illusid(86138069)
-
-    # p = Pixiv('chrome')
-    # url = 'https://www.pixiv.net/en/tags/arknights%205000users/artworks?s_mode=s_tag'
-    # page = p.get_page(url, use_selenium=True)['html']
-    # with open('page.html', 'w', encoding='utf-8') as f:
-    #     f.write(page)
-    #
-    # # p = Pixiv()
-    # # with open('page.html', 'r', encoding='utf-8') as f:
-    # #     page = f.read()
-    # # artworks = p.get_artworks_from_page(page)
-    # # print(artworks)
-    #
-    # with open('page.html', 'r', encoding='utf-8') as f:
-    #     page = f.read()
-    # # artworks = Pixiv.get_multi_artworks_from_page(page)
-    # # artworks = Pixiv.get_artworks_from_page(page)
-    # artworks = Pixiv.get_total_number_from_page(page)
-    # print(artworks)
-
-    # p = Pixiv('chrome')
-    # terms = ['stein gate 1000users入り']
-    # # terms = ['アークナイツ10000users入り']
-    # # terms = ['lappland 10000users入り']
-    # for t in terms:
-    #     artworks = p.search(t, number=200)
-    #     # p.download(artworks, '../' + t)
-
-    # p = Pixiv()
-    # cookies = p.load_cookies('chrome')
-    # p.web_driver.get('https://www.pixiv.net')
-    # for cookie in cookies:
-    #     p.web_driver.add_cookie({"name": cookie.name, "value": cookie.value, "domain": cookie.domain})
-    #     print({"name": cookie.name, "value": cookie.value, "domain": cookie.domain})
-    # p.web_driver.get('https://www.pixiv.net/tags/lappland/artworks?s_mode=s_tag')
-
-    # from utils.path import *
-    # path = join_(parent_path_(root_path_()), 'chromedrivers', '87', 'chromedirver.exe')
-    # print(path)
-    # path = ';{}'.format(path)
-    # os.environ['PATH'] += path
-    # env = os.environ['PATH']
-    # print(path)
-    # print(env)
-
-    # p = Pixiv()
-    # url = p.get_url_by_illusid('84566199', 2, original=False)
-    # print(url)
-
-    # test of ThreadPoolExecutor
-    # import time
-    # from random import randrange
-    # from concurrent.futures import as_completed
-    #
-    # def do(i, b):
-    #     if get_termination():
-    #         return
-    #     time.sleep(randrange(1, 5)/10)
-    #     # time.sleep(0.5)
-    #     # print_(STD_INFO + str(i))
-    #     b.update()
-    #     return i
-    #
-    # global termination
-    # lock = Lock()
-    #
-    # def set_termination(bo):
-    #     global termination
-    #     lock.acquire()
-    #     termination = bo
-    #     lock.release()
-    #     return bo
-    #
-    #
-    # def get_termination():
-    #     global termination
-    #     bo = True
-    #     lock.acquire()
-    #     bo = termination
-    #     lock.release()
-    #     return bo
-    #
-    #
-    # artworks = [i for i in range(100)]
-    # threads = []
-    # # bar = tqdm(colour='green', position=0, leave=True)
-    # bar = ProgressBar()
-    # bar.reset(len(artworks))
-    # with ThreadPoolExecutor(max_workers=3) as executor:
-    #     set_termination(False)
-    #     for illusid in artworks:
-    #         threads.append(executor.submit(do, illusid, bar))
-    #     print('\nafter assignment')
-    #     bar.display()
-    #     # input("terminate?")
-    #     # set_termination(True)
-    #     # for task in as_completed(threads):
-    #     #     print_(task.result())
-    #     #     pass
-    # print('out_of_main')
+        contents = []
+        mapping = {False: '', True: '_r18'}
+        r_18 = mapping[R_18]
+        mapping = {'': '', 'illustrations': 'content=illust', 'manga': 'content=manga'}
+        type_of_artwork = mapping[artwork_type]
+        i = 0
+        while True:
+            i += 1
+            url = 'https://www.pixiv.net/ranking.php?mode={}{}&{}&p={}&format=json'\
+                .format(mode, r_18, type_of_artwork, i)
+            self.print_(STD_INFO + 'fetching ' + url)
+            page = self.get_page(url, use_selenium=True)['html']
+            soup = BeautifulSoup(page, features='lxml')
+            soup = soup.find('pre')
+            js = json.loads(soup.text)
+            content = js['contents']
+            if content is not None:
+                contents += content
+                if len(contents) > number:
+                    # drop tailing if surpassed
+                    contents = self.sort_dict_by_key(contents, 'rank')
+                    contents = contents[:number]
+            else:
+                if len(contents) < number:
+                    self.print_(STD_WARNING + 'insufficient ranking artworks')
+                break
+            if len(contents) >= number:
+                break
+        self.print_(STD_INFO + str(len(contents)) + ' artworks have been collected, search completed.')
+        return contents

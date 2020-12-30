@@ -25,7 +25,7 @@ Open terminal under root folder of the project:
 **Search and download**
 
 ```bash
-python pixiv.py [-s SEARCH] [-n NUMBER] [-o OUT] [-sm SEARCH_MODE] [--m MODE] [-d] [-ori]
+python main.py -by search [-s SEARCH] [-n NUMBER] [-o OUT] [-m SEARCH_MODE] [-l AGE_LIMIT] [-t TYPE] [-d] [-ori] 
 ```
 
 *necessary*
@@ -36,15 +36,16 @@ python pixiv.py [-s SEARCH] [-n NUMBER] [-o OUT] [-sm SEARCH_MODE] [--m MODE] [-
 *optional*
 
 - -o: the folder to save artworks; default by a dictionary named by the term you searched for under root folder of project. 
-- -sm: search mode; ```perfect``` for perfect matching; default by partial matching; ```title``` for title matching;.
-- -m: age limitation; ```safe``` for ALL AGE; ```r18``` for R18 ONLY; default by no limit.
+- -m: search mode; ```perfect``` for perfect matching; ```partial``` for partial matching; ```title``` for title matching;
+- -l: age limitation; ```safe``` for ALL AGE; ```r18``` for R18 ONLY; ```all``` for no limit.
+- -t: type of artwork; ```illustrations``` for illustrations; ```manga``` for manga.
 - -d: flag, set to directly download searched results without asking for confirmation.
 - -ori: flag, set to download original picture(.png), otherwise download compressed picture(.jpg).
 
 **Download via id**
 
 ```bash
-python pixiv.py [-id ILLUSID] [-o OUT] [-p] [-ori]
+python main.py -by id [-id ILLUSID] [-o OUT] [-p PAGES] [-ori]
 ```
 
 *necessary*
@@ -54,26 +55,45 @@ python pixiv.py [-id ILLUSID] [-o OUT] [-p] [-ori]
 *optional*
 
 - -o: the folder to save artworks; default by root folder of project.
-- -p; the number of painting contained by the target artwork with identical id; default by 1.
+- -p; the number of painting contained by the target artwork; default by 1.
 - -ori: flag, set to download original picture(.png); default by downloading compressed picture(.jpg).
 
 **Download via author's id**
 
 ```bash
-python pixiv.py [-aut AUTHOR_ID] [-n NUMBER] [-o OUT] [-d] [-ori] [-manga]
+python main.py -by author [-aut AUTHOR_ID] [-n NUMBER] [-o OUT] [-t TYPE] [-d] [-ori]
 ```
 
 *necessary*
 
-- -id: id of the author.
+- -aut: id of the author.
 - -n: number of results you want to get, ```0``` for all artworks.
 
 *optional*
 
 - -o: the folder to save artworks; default by root folder of project.
+- -t: type of artwork; ```illustrations``` for illustrations; ```manga``` for manga.
 - -d: flag, set to directly download searched results without asking for confirmation.
 - -ori: flag, set to download original picture(.png); default by downloading compressed picture(.jpg).
-- -manga: flag, set to download the author's manga instead of illustrations.
+
+**Download ranking **
+
+```bash
+python main.py -by rank [-n NUMBER] [-o OUT] [-m PERIOD] [-l AGE_LIMIT] [-t TYPE] [-d] [-ori] 
+```
+
+*necessary*
+
+- -n: number of results you want to get.
+
+*optional*
+
+- -o: the folder to save artworks; default by a dictionary named by the term you searched for under root folder of project. 
+- -m: ranking period; ```daily``` for daily ranking; ```weekly``` for weekly ranking; ```monthly``` for monthly ranking;
+- -l: age limitation; ```safe``` for ALL AGE; ```r18``` for R18 ONLY; ```all``` for no limit.
+- -t: type of artwork; ```illustrations``` for illustrations; ```manga``` for manga.
+- -d: flag, set to directly download searched results without asking for confirmation.
+- -ori: flag, set to download original picture(.png), otherwise download compressed picture(.jpg).
 
 ## Examples
 
@@ -82,19 +102,19 @@ python pixiv.py [-aut AUTHOR_ID] [-n NUMBER] [-o OUT] [-d] [-ori] [-manga]
 Search for 100 artworks related to "stein gate 1000users入り" in png format.
 
 ```bash
-python pixiv.py -s "stein gate 1000users入り" -n 100 -ori
+python main.py -by search -s "stein gate 1000users入り" -n 100 -ori
 ```
 
 Search for 100 artworks related to "stein gate 1000users入り" and download them without asking for confirmation.
 
 ```bash
-python pixiv.py -s "stein gate 1000users入り" -n 100 -d
+python main.py -by search -s "stein gate 1000users入り" -n 100 -d
 ```
 
 Search for 100 artworks perfectly matched with "stein gate 1000users入り"  for all ages and save it under ```./artworks```.
 
 ```bash
-python pixiv.py -s "stein gate 1000users入り" -n 100 -o "./artworks" --sm perfect -m safe
+python main.py -by search -s "stein gate 1000users入り" -n 100 -o "./artworks" -m perfect -l safe
 ```
 
 **Download via id**
@@ -102,27 +122,29 @@ python pixiv.py -s "stein gate 1000users入り" -n 100 -o "./artworks" --sm perf
 Download the artworks with id: 78396392 under ```./art```
 
 ```bash
-python pixiv.py -id 78396392 -o art
+python main.py -by id -id 78396392 -o art
 ```
 
 Download the artworks with id: 82733226 under ```./art``` which contains 26 paintings.
 
 ```bash
-python pixiv.py -id 82733226 -o art -p 26
+python main.py -by id -id 82733226 -o art -p 26
 ```
 
 **Download via author's id**
 
-Download all artworks of the author with id 5806400.
-
-```bash
-python pixiv.py -aut 5806400 -n 0
-```
-
 Download all manga of the author with id 5806400.
 
 ```bash
-python pixiv.py -aut 5806400 -n 0 -manga
+python main.py -by author -aut 5806400 -n 0 -t manga
+```
+
+**Download ranking**
+
+Download top 10 artworks of daily ranking.
+
+```bash
+python main.py -by rank -n 10 -m daily
 ```
 
 ## Demo
