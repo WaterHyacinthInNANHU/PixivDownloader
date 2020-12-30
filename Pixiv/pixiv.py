@@ -591,5 +591,8 @@ class Pixiv(object):
                 break
             if len(contents) >= number:
                 break
+        # modify names of artworks
+        for item in contents:
+            item['illust_title'] = "#{}_{}".format(item['rank'], item['illust_title'])
         self.print_(STD_INFO + str(len(contents)) + ' artworks have been collected, search completed.')
         return contents
