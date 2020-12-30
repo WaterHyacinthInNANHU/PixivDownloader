@@ -76,7 +76,7 @@ python main.py -by author [-aut AUTHOR_ID] [-n NUMBER] [-o OUT] [-t TYPE] [-d] [
 - -d: flag, set to directly download searched results without asking for confirmation.
 - -ori: flag, set to download original picture(.png); default by downloading compressed picture(.jpg).
 
-**Download ranking **
+**Download rank**
 
 ```bash
 python main.py -by rank [-n NUMBER] [-o OUT] [-m PERIOD] [-l AGE_LIMIT] [-t TYPE] [-d] [-ori] 
@@ -89,7 +89,7 @@ python main.py -by rank [-n NUMBER] [-o OUT] [-m PERIOD] [-l AGE_LIMIT] [-t TYPE
 *optional*
 
 - -o: the folder to save artworks; default by a dictionary named by the term you searched for under root folder of project. 
-- -m: ranking period; ```daily``` for daily ranking; ```weekly``` for weekly ranking; ```monthly``` for monthly ranking;
+- -m: ranking period; ```daily``` for daily rank; ```weekly``` for weekly rank; ```monthly``` for monthly rank;
 - -l: age limitation; ```safe``` for ALL AGE; ```r18``` for R18 ONLY; ```all``` for no limit.
 - -t: type of artwork; ```illustrations``` for illustrations; ```manga``` for manga.
 - -d: flag, set to directly download searched results without asking for confirmation.
@@ -139,9 +139,9 @@ Download all manga of the author with id 5806400.
 python main.py -by author -aut 5806400 -n 0 -t manga
 ```
 
-**Download ranking**
+**Download rank**
 
-Download top 10 artworks of daily ranking.
+Download top 10 artworks of daily rank.
 
 ```bash
 python main.py -by rank -n 10 -m daily
