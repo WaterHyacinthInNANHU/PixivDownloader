@@ -310,32 +310,32 @@ class Pixiv(object):
         :param original: flag, set to download original picture
         :return: None
         """
-        urls = self.get_url_by_illusid(illusid, number_of_paintings, original)
-        if len(urls) > 1:
-            path = '{}/{}_id_{}'.format(path, str(name), str(illusid))
-            mkdir_(path)
-        for index, url in enumerate(urls):
-            try:
-                response = self.get_page(url)['response']
-            except PageFailedToRespond:
-                self.print_('\n' + STD_ERROR + 'error occurred downloading ' + name + ' ' + url)
-                continue
-            bytestream = response.content
-            if check_jpg_jpeg_stream(bytestream):
-                image_type = '.jpg'
-            elif check_png_stream(bytestream):
-                image_type = '.png'
-            else:
-                self.print_('\n' + STD_WARNING + 'unsupported format or broken file, drop: ' + name + ' ' + url)
-                continue
-            if index is not 0:
-                p = '_p{}'.format(index)
-            else:
-                p = ''
-            name = self.replace_system_character(name, char='%')
-            file_path = '{}/{}_id_{}{}{}'.format(path, str(name), str(illusid), p, image_type)
-            with open(file_path, 'wb') as f:
-                f.write(bytestream)
+        # urls = self.get_url_by_illusid(illusid, number_of_paintings, original)
+        # if len(urls) > 1:
+        #     path = '{}/{}_id_{}'.format(path, str(name), str(illusid))
+        #     mkdir_(path)
+        # for index, url in enumerate(urls):
+        #     try:
+        #         response = self.get_page(url)['response']
+        #     except PageFailedToRespond:
+        #         self.print_('\n' + STD_ERROR + 'error occurred downloading ' + name + ' ' + url)
+        #         continue
+        #     bytestream = response.content
+        #     if check_jpg_jpeg_stream(bytestream):
+        #         image_type = '.jpg'
+        #     elif check_png_stream(bytestream):
+        #         image_type = '.png'
+        #     else:
+        #         self.print_('\n' + STD_WARNING + 'unsupported format or broken file, drop: ' + name + ' ' + url)
+        #         continue
+        #     if index is not 0:
+        #         p = '_p{}'.format(index)
+        #     else:
+        #         p = ''
+        #     name = self.replace_system_character(name, char='%')
+        #     file_path = '{}/{}_id_{}{}{}'.format(path, str(name), str(illusid), p, image_type)
+        #     with open(file_path, 'wb') as f:
+        #         f.write(bytestream)
 
         self.p_bar.update()
 

@@ -25,16 +25,26 @@ logging.basicConfig(
 )
 
 print_lock = Lock()
+last_print_mode = True  # record latest mode of print_()
 
 
-def print_(info, **kwargs):
+def print_(string, print_in_same_line=False, **kwargs):
     """
     thread printing
-    :param info: message to be printed
+    :param string: string to be printed
+    :param print_in_same_line: set True to print in the same line
     :return: None
     """
+    global last_print_mode, print_lock
     print_lock.acquire()
-    print(info, **kwargs)
+    if print_in_same_line:
+        print('\r', end='')
+        print('\r{}'.format(string), end='', flush=True)
+    else:
+        if last_print_mode:  # print \r to avoid redundant new line
+            print('\r')
+        print(string, **kwargs)
+    last_print_mode = print_in_same_line
     print_lock.release()
 
 
@@ -70,10 +80,10 @@ class ProgressBar(object):
         integer = int(points / 10)
         decimal = points % 10
         if points != 1000:
-            print_("\r{}progress:| {}{}{} | {} / {} |".format(percent, '#'*integer, decimal, '-'*(99-integer), n,
-                                                              total), end='', flush=True)
+            print_("{}progress:| {}{}{} | {} / {} |".format(percent, '#' * integer, decimal, '-' * (99 - integer), n,
+                                                            total), print_in_same_line=True)
         else:
-            print_("\r{}progress:| {} | {} / {} |".format(percent, '#' * 100, n, total))
+            print_("{}progress:| {} | {} / {} |".format(percent, '#' * 100, n, total), print_in_same_line=True)
 
     def reset(self, total: int = None):
         self.lock.acquire()
