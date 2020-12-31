@@ -593,6 +593,6 @@ class Pixiv(object):
                 break
         # modify names of artworks
         for item in contents:
-            item['illust_title'] = "#{}_{}".format(item['rank'], item['illust_title'])
+            item['title'] = "#{}_{}".format(item['rank'], item['title'])
         self.print_(STD_INFO + str(len(contents)) + ' artworks have been collected, search completed.')
         return contents
