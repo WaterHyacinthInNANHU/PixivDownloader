@@ -5,6 +5,7 @@ import logging
 import sys
 from termcolor import colored
 from threading import Lock
+from datetime import datetime
 
 STD_INFO = colored('[INFO] ', 'green')
 STD_ERROR = colored('[ERROR] ', 'red')
@@ -26,6 +27,15 @@ logging.basicConfig(
 
 print_lock = Lock()
 last_print_mode = True  # record latest mode of print_()
+
+date_lock = Lock()
+
+
+def get_time():
+    date_lock.acquire()
+    time = datetime.now()
+    date_lock.release()
+    return time
 
 
 def print_(string, print_in_same_line=False, **kwargs):
@@ -49,11 +59,13 @@ def print_(string, print_in_same_line=False, **kwargs):
 
 
 def print_exceptions(ex: Exception) -> None:
-    print_('{0}: {1}'.format(ex.__class__.__name__, ex))
+    print_('{}: {}'.format(ex.__class__.__name__, ex))
 
 
 def print_exceptions_to_file(ex: Exception, file) -> None:
-    print_('{0}: {1}'.format(ex.__class__.__name__, ex), file=file)
+    now = get_time()
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+    print_('[{}] {}: {}'.format(dt_string, ex.__class__.__name__, ex), file=file)
 
 
 class ProgressBar(object):

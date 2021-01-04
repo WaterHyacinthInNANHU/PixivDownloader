@@ -187,6 +187,14 @@ def main():
 if __name__ == '__main__':
     main()
 
+    # headers = {
+    #     'Referer': 'https://www.pixiv.net',
+    #     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) '
+    #                   'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'
+    # }
+    # res = re.get(url='https://www.pixiv.net/ajax/illust/86772270', headers=headers)
+    # print(res)
+
     # p = Pixiv()
     # p.search_by_ranking(10, 'daily', 'illustrations')
 

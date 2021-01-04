@@ -12,7 +12,7 @@ This is a scrap project to search and download artworks from pixiv.net
 - Install dependencies:
 
 ```bash
-pip install -r src/requirements.txt
+pip install -r Pixiv/requirements.txt
 ```
 
 - Download a [web driver](https://sites.google.com/a/chromium.org/chromedriver/downloads) according to your chrome version ([how can I get the version of my chrome browser?](https://www.businessinsider.com/what-version-of-google-chrome-do-i-have?r=DE&IR=T)) and save the it under ```src/driver/```.

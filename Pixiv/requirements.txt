@@ -1,5 +1,5 @@
 selenium
-request
+requests
 browser_cookie3
 colorama
 beautifulsoup4
