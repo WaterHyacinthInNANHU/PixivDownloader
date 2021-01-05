@@ -33,9 +33,14 @@ def download_by_id(pixiv: Pixiv, args_):
     else:
         out_dir = args_.out
 
+    if args_.number_of_paintings is None:
+        number_of_paintings = 1
+    else:
+        number_of_paintings = args_.number_of_paintings
+
     pixiv.download(
-        [{'illust_id': args_.illusid, 'illust_page_count': args_.number_of_paintings, 'illust_title': 'artwork'}]
-        , out_dir, original=args_.original)
+        [{'illust_id': args_.illusid, 'illust_page_count': number_of_paintings, 'illust_title': 'artwork'}], out_dir,
+        original=args_.original)
 
 
 def download_by_searching(pixiv: Pixiv, args_):
@@ -176,7 +181,12 @@ def download_by_ranking(pixiv: Pixiv, args_):
 
 
 def main():
-    pixiv = Pixiv('chrome')
+    proxies = {
+        'http': 'http://127.0.0.1:41091',
+        'https': 'http://127.0.0.1:41091'
+    }
+    # proxies = None
+    pixiv = Pixiv('chrome', proxies=proxies)
     args = get_args()
     download_by_id(pixiv, args)
     download_by_author(pixiv, args)

@@ -26,7 +26,7 @@ class Pixiv(object):
     REQUEST_INTERVAL = 0.050
     SYSTEM_CHARACTERS = r'\/:*?"<>'
 
-    def __init__(self, browser='chrome', print__=print_):
+    def __init__(self, browser='chrome', print__=print_, proxies=None):
         """
         :param browser: 'chrome' or 'firefox'
         :param print__: a function to log information
@@ -37,6 +37,7 @@ class Pixiv(object):
                           'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'
         }
         self.print_ = print__
+        self.proxies = proxies
         self.cookies = self.load_cookies(browser)
 
         self.session = requests.Session()
@@ -245,7 +246,7 @@ class Pixiv(object):
                 self._session_get_lock.acquire()
                 sleep(Pixiv.REQUEST_INTERVAL)
                 self._session_get_lock.release()
-                return self.session.get(url, **kwargs)
+                return self.session.get(url, proxies=self.proxies, **kwargs)
             except requests.exceptions.ConnectionError as e:
                 last_connection_exception = e
                 retries -= 1
