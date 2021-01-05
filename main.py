@@ -181,11 +181,11 @@ def download_by_ranking(pixiv: Pixiv, args_):
 
 
 def main():
-    proxies = {
-        'http': 'http://127.0.0.1:41091',
-        'https': 'http://127.0.0.1:41091'
-    }
-    # proxies = None
+    # proxies = {
+    #     'http': 'http://127.0.0.1:41091',
+    #     'https': 'http://127.0.0.1:41091'
+    # }
+    proxies = None
     pixiv = Pixiv('chrome', proxies=proxies)
     args = get_args()
     download_by_id(pixiv, args)
