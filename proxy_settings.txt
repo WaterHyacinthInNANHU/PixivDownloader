@@ -1,0 +1,7 @@
+{
+    "_comment":
+    "please set your proxies in this file",
+
+    "http": null,
+    "https": null
+}

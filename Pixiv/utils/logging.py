@@ -62,10 +62,10 @@ def print_exceptions(ex: Exception) -> None:
     print_('{}: {}'.format(ex.__class__.__name__, ex))
 
 
-def print_exceptions_to_file(ex: Exception, file) -> None:
+def print_exceptions_to_file(ex: Exception, file, additional='') -> None:
     now = get_time()
-    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-    print_('[{}] {}: {}'.format(dt_string, ex.__class__.__name__, ex), file=file)
+    dt_string = now.strftime("%m/%d/%Y %H:%M:%S")
+    print_('[{}] {}: {} {}'.format(dt_string, ex.__class__.__name__, ex, additional), file=file)
 
 
 class ProgressBar(object):

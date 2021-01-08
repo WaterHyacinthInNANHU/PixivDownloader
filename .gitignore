@@ -131,3 +131,4 @@ dmypy.json
 /driver/chromedriver.exe
 /exceptions_log.txt
 /.idea/
+/daily_top50_artworks_01-08-2021/

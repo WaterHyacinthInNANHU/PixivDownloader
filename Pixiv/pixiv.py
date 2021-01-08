@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 import requests
 from requests.adapters import HTTPAdapter
-import re
+# import re
 import signal
 from .utils.check_image import check_png_stream, check_jpg_jpeg_stream
 from .utils.path import *
@@ -9,6 +9,7 @@ from .utils.logging import *
 from .exception import *
 import browser_cookie3
 from selenium import webdriver
+from selenium.webdriver.common.proxy import Proxy, ProxyType
 from urllib import parse
 from random import choice
 from concurrent.futures import ThreadPoolExecutor
@@ -51,17 +52,31 @@ class Pixiv(object):
 
         self.set_environment_variable()
 
+        # set proxy for web driver
+        # source: https://stackoverflow.com/questions/17082425/running-selenium-webdriver-with-a-proxy-in-python
+        capabilities = None
+        if proxies is not None:
+            driver_proxy = Proxy()
+            driver_proxy.proxy_type = ProxyType.MANUAL
+            driver_proxy.http_proxy = proxies['http'] if proxies['http'] is not None else ''
+            driver_proxy.ssl_proxy = proxies['https'] if proxies['https'] is not None else ''
+            if browser == 'chrome':
+                capabilities = webdriver.DesiredCapabilities.CHROME
+            else:
+                capabilities = webdriver.DesiredCapabilities.FIREFOX
+            driver_proxy.add_to_capabilities(capabilities)
+
         if browser == 'chrome':
             options = webdriver.ChromeOptions()
             options.add_argument('--headless')
             options.add_argument('log-level=3')
             options.add_experimental_option('excludeSwitches', ['enable-logging'])
-            self.web_driver = webdriver.Chrome(options=options)
-        elif browser == 'firefox':
+            self.web_driver = webdriver.Chrome(options=options, desired_capabilities=capabilities)
+        else:
             options = webdriver.FirefoxOptions()
             options.add_argument('--headless')
             options.add_argument('log-level=3')
-            self.web_driver = webdriver.Firefox(options=options)
+            self.web_driver = webdriver.Firefox(options=options, desired_capabilities=capabilities)
 
         self.p_bar = ProgressBar()
 
@@ -329,7 +344,7 @@ class Pixiv(object):
             else:
                 self.print_('\n' + STD_WARNING + 'unsupported format or broken file, drop: ' + name + ' ' + url)
                 continue
-            if index is not 0:
+            if len(urls) > 1:
                 p = '_p{}'.format(index)
             else:
                 p = ''

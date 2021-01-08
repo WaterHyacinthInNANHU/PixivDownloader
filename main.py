@@ -1,5 +1,7 @@
 from Pixiv.pixiv import Pixiv
 from Pixiv.utils.logging import *
+from Pixiv.utils.path import *
+import json
 
 
 def get_args():
@@ -161,7 +163,10 @@ def download_by_ranking(pixiv: Pixiv, args_):
     res = pixiv.search_by_ranking(args_.number, mode, args_.type, r_18)
 
     if args_.out is None:
-        path = './top{}_artworks_{}'.format(args_.number, args_.mode)
+        time = get_time()
+        dt_string = time.strftime("%m/%d/%Y")
+        dt_string = replace_system_character(dt_string, '-')
+        path = './{}_top{}_artworks_{}'.format(args_.mode, args_.number, dt_string)
     else:
         path = args_.out
 
@@ -181,11 +186,9 @@ def download_by_ranking(pixiv: Pixiv, args_):
 
 
 def main():
-    # proxies = {
-    #     'http': 'http://127.0.0.1:41091',
-    #     'https': 'http://127.0.0.1:41091'
-    # }
-    proxies = None
+    with open('proxy_settings.txt', 'r') as f:
+        proxies = json.load(f)
+    proxies = proxies if proxies['http'] is not None or proxies['https'] is not None else None
     pixiv = Pixiv('chrome', proxies=proxies)
     args = get_args()
     download_by_id(pixiv, args)
@@ -196,6 +199,9 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+#   test field
 
     # headers = {
     #     'Referer': 'https://www.pixiv.net',

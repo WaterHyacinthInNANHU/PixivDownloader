@@ -1,7 +1,9 @@
 # PixivDownloader
-This is a scrap project to search and download artworks from pixiv.net
+This is a scrap project to search and download artworks from pixiv.net.
 
-## Install
+Proxy settings are available.
+
+## Install 
 
 - [Set up python3](https://www.python.org/downloads/).
 
@@ -95,6 +97,40 @@ python main.py -by rank [-n NUMBER] [-o OUT] [-m PERIOD] [-l AGE_LIMIT] [-t TYPE
 - -d: flag, set to directly download searched results without asking for confirmation.
 - -ori: flag, set to download original picture(.png), otherwise download compressed picture(.jpg).
 
+## Using Proxy
+
+If you wish to use **VPN** or other forms of proxies to access [pixiv.net](www.pixiv.net), simply modify ```proxy_settings.txt``` under the root folder.
+
+For example, original text is written as the following.
+
+*proxy_settings.txt*
+
+```json
+{
+    "_comment":
+    "please set your proxies in this file",
+
+    "http": null,
+    "https": null
+}
+```
+
+Then just replace ```null``` with your proxy's address and port, which usually can be found on your proxy software.
+
+```json
+{
+    "_comment":
+    "please set your proxies in this file",
+
+    "http": "http://127.0.0.1:41091",
+    "https": "https://127.0.0.1:41091"
+}
+```
+
+You can set proxy for **http** and **https** requests of the scrap **respectively** with different proxy's address here.
+
+Or you can just set them as same. I used http proxy for https request as well due to ssl version problems. It's not recommended owning to safety concerns.
+
 ## Examples
 
 **Search and download**
@@ -122,7 +158,7 @@ python main.py -by search -s "stein gate 1000users入り" -n 100 -o "./artworks"
 Download the artworks with id: 78396392 under ```./art```
 
 ```bash
-python main.py -by id -id 78396392 -o art
+python main.py -by id -id 78396392 -o art -p 1
 ```
 
 Download the artworks with id: 82733226 under ```./art``` which contains 26 paintings.
@@ -155,7 +191,6 @@ python main.py -by rank -n 10 -m daily
 
 ## Note
 
-- Must have chrome installed on your device.
-- Privacy concern: this tool utilize cookies of [pixiv.net](www.pixiv.net) from your chrome browser only to load [dynamic pages](https://www.doteasy.com/web-hosting-articles/what-is-a-dynamic-web-page.cfm).
-- If you are using VPN or other forms of proxy, make sure to be under global mode.
+- Must have **chrome** installed on your device.
+- **Privacy concern**: this tool utilize cookies of [pixiv.net](www.pixiv.net) from your chrome browser only to load [dynamic pages](https://www.doteasy.com/web-hosting-articles/what-is-a-dynamic-web-page.cfm).
 

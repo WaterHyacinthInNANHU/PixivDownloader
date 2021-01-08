@@ -1,7 +1,9 @@
 import os.path as osp
 import os
 from pathlib import Path
-import sys
+import re
+
+SYSTEM_CHARACTERS = r'\/:*?"<>'
 
 
 def mkdir_(path):
@@ -34,3 +36,11 @@ def set_path_(*path):
 
 def get_path_of_environment_variable_(variable):
     return os.environ[variable]
+
+
+def replace_system_character(string: str, char: str = '&'):
+    rx = '[' + re.escape(SYSTEM_CHARACTERS) + ']'
+    res = re.sub(rx, char, string)
+    spaces = [1 for c in res if c == ' ']
+    res = res[len(spaces):]
+    return res
