@@ -35,13 +35,13 @@ def download_by_id(pixiv: Pixiv, args_):
     else:
         out_dir = args_.out
 
-    if args_.number_of_paintings is None:
-        number_of_paintings = 1
+    if args_.number_of_pages is None:
+        number_of_pages = 1
     else:
-        number_of_paintings = args_.number_of_paintings
+        number_of_pages = args_.number_of_pages
 
     pixiv.download(
-        [{'illust_id': args_.illusid, 'illust_page_count': number_of_paintings, 'illust_title': 'artwork'}], out_dir,
+        [{'illust_id': args_.illusid, 'illust_page_count': number_of_pages, 'title': 'artwork'}], out_dir,
         original=args_.original)
 
 
