@@ -155,7 +155,7 @@ def download_by_ranking(pixiv: Pixiv, args_):
     elif args_.mode == 'daily':
         mode = 'daily'
     elif args_.mode is None:
-        mode = 'weekly'
+        mode = 'daily'
     else:
         print_(STD_ERROR + 'parameter invalid: -m')
         return
@@ -166,7 +166,7 @@ def download_by_ranking(pixiv: Pixiv, args_):
         time = get_time()
         dt_string = time.strftime("%m/%d/%Y")
         dt_string = replace_system_character(dt_string, '-')
-        path = './{}_top{}_artworks_{}'.format(args_.mode, args_.number, dt_string)
+        path = './{}_top{}_artworks_{}'.format(mode, args_.number, dt_string)
     else:
         path = args_.out
 
@@ -200,8 +200,7 @@ def main():
 if __name__ == '__main__':
     main()
 
-
-#   test field
+    #  test field
 
     # headers = {
     #     'Referer': 'https://www.pixiv.net',

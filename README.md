@@ -91,7 +91,7 @@ python main.py -by rank [-n NUMBER] [-o OUT] [-m PERIOD] [-l AGE_LIMIT] [-t TYPE
 *optional*
 
 - -o: the folder to save artworks; default by a dictionary named by the term you searched for under root folder of project. 
-- -m: ranking period; ```daily``` for daily rank; ```weekly``` for weekly rank; ```monthly``` for monthly rank;
+- -m: ranking period; ```daily``` for daily rank; ```weekly``` for weekly rank; ```monthly``` for monthly rank; default by ```daily```
 - -l: age limitation; ```safe``` for ALL AGE; ```r18``` for R18 ONLY; ```all``` for no limit.
 - -t: type of artwork; ```illustrations``` for illustrations; ```manga``` for manga.
 - -d: flag, set to directly download searched results without asking for confirmation.
@@ -129,7 +129,7 @@ Then just replace ```null``` with your proxy's address and port, which usually c
 
 You can set proxy for **http** and **https** requests of the scrap **respectively** with different proxy's address here.
 
-Or you can just set them as same. I used http proxy for https request as well due to ssl version problems. It's not recommended owning to safety concerns.
+Or you can simply set them as same. I used http proxy for https request as well due to SSLversion problems. It's not recommended owning to safety concerns.
 
 ## Examples
 
@@ -192,5 +192,5 @@ python main.py -by rank -n 10 -m daily
 ## Note
 
 - Must have **chrome** installed on your device.
-- **Privacy concern**: this tool utilize cookies of [pixiv.net](www.pixiv.net) from your chrome browser only to load [dynamic pages](https://www.doteasy.com/web-hosting-articles/what-is-a-dynamic-web-page.cfm).
+- Privacy concern: this tool utilize cookies of [pixiv.net](www.pixiv.net) from your chrome browser only to load [dynamic pages](https://www.doteasy.com/web-hosting-articles/what-is-a-dynamic-web-page.cfm).
 

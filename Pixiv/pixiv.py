@@ -50,6 +50,9 @@ class Pixiv(object):
         self.session.cookies = self.cookies
         self.session.headers = self.headers
 
+        self.buffer = {}    # store pages(pages got by selenium won't be stored)
+        self.buffer_lock = Lock()
+
         self.set_environment_variable()
 
         # set proxy for web driver
@@ -267,12 +270,13 @@ class Pixiv(object):
                 retries -= 1
         raise last_connection_exception
 
-    def get_page(self, url: str, cookies=None, use_selenium: bool = False):
+    def get(self, url: str, cookies=None, use_selenium: bool = False, use_buffer: bool = False):
         """
         get page from url
         :param url: url
         :param cookies: cookies
         :param use_selenium: flag, set to use selenium to load page
+        :param use_buffer: use buffered page
         :return: a dictionary containing text of html and status code   (and response object returned by session.get)
         """
         if cookies is None:
@@ -282,8 +286,7 @@ class Pixiv(object):
                 # reload cookies
                 self.web_driver.delete_all_cookies()
                 # https://stackoverflow.com/questions/41559510/selenium-chromedriver-add-cookie-invalid-domain-error/44857193
-                self.web_driver.get(
-                    Pixiv.home_page)
+                self.web_driver.get(Pixiv.home_page)
                 for cookie in cookies:
                     self.web_driver.add_cookie({"name": cookie.name, "value": cookie.value, "domain": cookie.domain})
                 self.web_driver.get(url)
@@ -291,67 +294,89 @@ class Pixiv(object):
                 raise PageIsNotAvailableError
             return {'html': self.web_driver.page_source, 'code': 200}
         else:
+            if use_buffer:
+                self.buffer_lock.acquire()
+                if url in self.buffer:
+                    res = self.buffer[url].copy()
+                    self.buffer_lock.release()
+                    return res
+                self.buffer_lock.release()
             r = self._session_get(url)
             if r.status_code is not 200:
                 raise PageIsNotAvailableError
+            if use_buffer:
+                self.buffer_lock.acquire()
+                self.buffer[url] = {'html': r.text, 'response': r, 'code': r.status_code}
+                self.buffer_lock.release()
             return {'html': r.text, 'response': r, 'code': r.status_code}
 
-    def get_url_by_illusid(self, illusid: str, number_of_paintings: int, original: bool = True):
+    def get_url_by_illusid(self, illusid: str, page_number: int, original: bool = True):
         """
         get urls via illusid
         :param illusid: illusid
-        :param number_of_paintings: number of paintings in identical illus
+        :param page_number: number of page in that artwork
         :param original: flag to download original file(.png)
-        :return: a list of urls of paintings
+        :return: url of painting
         """
-        html = self.get_page('https://www.pixiv.net/ajax/illust/' + str(illusid))['html']
-        urls = []
-        for number in range(number_of_paintings):
-            if original:
-                url = re.match(r'.*\"original\":\"(.*?)\".*', html).group(1)
-            else:
-                url = re.match(r'.*\"regular\":\"(.*?)\".*', html).group(1)
-            url = re.sub(r'p\d', 'p{}'.format(number), url)
-            url = url.replace('\\', '')
-            urls += [url]
-        return urls
+        html = self.get('https://www.pixiv.net/ajax/illust/' + str(illusid), use_buffer=True)['html']
+        if original:
+            url = re.match(r'.*\"original\":\"(.*?)\".*', html).group(1)
+        else:
+            url = re.match(r'.*\"regular\":\"(.*?)\".*', html).group(1)
+        url = re.sub(r'p\d', 'p{}'.format(page_number), url)
+        url = url.replace('\\', '')
+        return url
 
-    def _download(self, illusid: str, name: str, number_of_paintings: int, path: str, original: bool):
+    @staticmethod
+    def task_factory(artworks: list):
+        tasks = []
+        for item in artworks:
+            illust_id = item['illust_id']
+            title = item['title']
+            if 'illust_page_count' in item:
+                if int(item['illust_page_count']) is not 1:
+                    number_of_paintings = int(item['illust_page_count'])
+                    for number in range(number_of_paintings):
+                        tasks.append({'illust_id': illust_id, 'title': title, 'page_number': number, 'is_multiple': True})
+                    continue
+            tasks.append({'illust_id': illust_id, 'title': title, 'page_number': 0, 'is_multiple': False})
+        return tasks
+
+    def _download(self, task: dict, path: str, original: bool):
         """
         threading download callback function
-        :param illusid: illusid
-        :param name: name of the artwork
-        :param number_of_paintings: number of paintings in identical artwork
+        :param task: task dictionary
         :param path: path to save
         :param original: flag, set to download original picture
         :return: None
         """
-        urls = self.get_url_by_illusid(illusid, number_of_paintings, original)
-        if len(urls) > 1:
-            path = '{}/{}_id_{}'.format(path, str(name), str(illusid))
+        url = self.get_url_by_illusid(task['illust_id'], task['page_number'], original)
+        if task['is_multiple']:
+            path = '{}/{}_id_{}'.format(path, str(task['title']), str(task['illust_id']))
             mkdir_(path)
-        for index, url in enumerate(urls):
-            try:
-                response = self.get_page(url)['response']
-            except PageFailedToRespond:
-                self.print_('\n' + STD_ERROR + 'error occurred downloading ' + name + ' ' + url)
-                continue
-            bytestream = response.content
-            if check_jpg_jpeg_stream(bytestream):
-                image_type = '.jpg'
-            elif check_png_stream(bytestream):
-                image_type = '.png'
-            else:
-                self.print_('\n' + STD_WARNING + 'unsupported format or broken file, drop: ' + name + ' ' + url)
-                continue
-            if len(urls) > 1:
-                p = '_p{}'.format(index)
-            else:
-                p = ''
-            name = self.replace_system_character(name, char='%')
-            file_path = '{}/{}_id_{}{}{}'.format(path, str(name), str(illusid), p, image_type)
-            with open(file_path, 'wb') as f:
-                f.write(bytestream)
+        try:
+            response = self.get(url)['response']
+        except PageFailedToRespond:
+            self.print_('\n' + STD_ERROR + 'error occurred downloading ' + task['title'] + ' ' + url)
+            self.p_bar.update()
+            return
+        bytestream = response.content
+        if check_jpg_jpeg_stream(bytestream):
+            image_type = '.jpg'
+        elif check_png_stream(bytestream):
+            image_type = '.png'
+        else:
+            self.print_('\n' + STD_WARNING + 'unsupported format or broken file, drop: ' + task['title'] + ' ' + url)
+            self.p_bar.update()
+            return
+        if task['is_multiple']:
+            p = '_p{}'.format(task['page_number'])
+        else:
+            p = ''
+        filename = self.replace_system_character(task['title'], char='?')
+        file_path = '{}/{}_id_{}{}{}'.format(path, str(filename), str(task['illust_id']), p, image_type)
+        with open(file_path, 'wb') as f:
+            f.write(bytestream)
 
         self.p_bar.update()
 
@@ -367,24 +392,18 @@ class Pixiv(object):
             self.print_(STD_WARNING + 'no artwork to be downloaded, return')
             return
 
-        self.print_(STD_INFO + 'start downloading ' + str(len(artworks)) + ' items...')
+        tasks = self.task_factory(artworks)
 
-        self.p_bar.reset(len(artworks))
+        self.print_(STD_INFO + 'start downloading ' + str(len(tasks)) + ' items...')
+        self.p_bar.reset(len(tasks))
         self.p_bar.display()
 
         mkdir_(path)
         threads = []
         with ThreadPoolExecutor(max_workers=Pixiv.MAX_WORKERS) as executor:
-            for item in artworks:
-                # check multiple-painting artworks
-                number_of_paintings = 1
-                if 'illust_page_count' in item:
-                    if int(item['illust_page_count']) is not 1:
-                        number_of_paintings = int(item['illust_page_count'])
+            for task in tasks:
                 threads.append(
-                    executor.submit(self._download, item['illust_id'], item['title'], number_of_paintings, path,
-                                    original))
-
+                    executor.submit(self._download, task, path, original))
             # handle exceptions
             exceptions = []
             for task in as_completed(threads):
@@ -433,7 +452,7 @@ class Pixiv(object):
                                                                     page_number)
             self.print_(STD_INFO + 'fetching ' + url)
             while True:
-                page = self.get_page(url, use_selenium=True)['html']
+                page = self.get(url, use_selenium=True)['html']
                 new_artworks = self.get_artworks_from_page(page)
                 new_multi_artworks = self.get_multi_artworks_from_page(page)
 
@@ -518,7 +537,7 @@ class Pixiv(object):
             url = 'https://www.pixiv.net/en/users/{}/{}?p={}'.format(author_id, artwork_type, page_number)
             self.print_(STD_INFO + 'fetching ' + url)
             while True:
-                page = self.get_page(url, use_selenium=True)['html']
+                page = self.get(url, use_selenium=True)['html']
                 new_artworks = self.get_artworks_from_page(page)
                 new_multi_artworks = self.get_multi_artworks_from_page(page)
 
@@ -590,7 +609,7 @@ class Pixiv(object):
             url = 'https://www.pixiv.net/ranking.php?mode={}{}&{}&p={}&format=json'\
                 .format(mode, r_18, type_of_artwork, i)
             self.print_(STD_INFO + 'fetching ' + url)
-            page = self.get_page(url, use_selenium=True)['html']
+            page = self.get(url, use_selenium=True)['html']
             soup = BeautifulSoup(page, features='lxml')
             soup = soup.find('pre')
             js = json.loads(soup.text)
